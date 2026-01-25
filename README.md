@@ -443,9 +443,43 @@ static_asm/
 └── tests/
 ```
 
-## Adding New Instructions
+## Developing
 
-### Option 1: Use the Code Generator
+### Environment Setup
+
+This project uses [uv](https://docs.astral.sh/uv/) for Python tooling (code generation, single-header amalgamation).
+
+```bash
+# Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Verify installation
+uv --version
+
+# All Python scripts can be run directly with uv (dependencies are auto-managed)
+uv run scripts/gen_from_x86ref.py --help
+uv run scripts/amalgamate.sh
+```
+
+**Required tools:**
+
+| Tool | Purpose | Install |
+|------|---------|---------|
+| [uv](https://docs.astral.sh/uv/) | Python package/project manager | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| [quom](https://github.com/Viatorus/quom) | Single-header amalgamation | `uv tool install quom` |
+| CMake 3.19+ | Build system | [cmake.org](https://cmake.org/download/) |
+| C++20 compiler | GCC 11+, Clang 14+, MSVC 2022+ | - |
+
+**Optional tools for development:**
+
+| Tool | Purpose | Install |
+|------|---------|---------|
+| clang-format | Code formatting | Via LLVM or system package |
+| clang-tidy | Static analysis | Via LLVM or system package |
+
+### Adding New Instructions
+
+#### Option 1: Use the Code Generator
 
 The project includes a generator that parses the [x86reference](https://github.com/mazegen/x86reference) XML database:
 
@@ -464,7 +498,7 @@ uv run scripts/gen_from_x86ref.py --generate-db
 uv run scripts/gen_from_x86ref.py --generate-tests
 ```
 
-### Option 2: Manual Addition
+#### Option 2: Manual Addition
 
 1. Add to the instruction db file (`instdb`, `prefix_db`, `prefix_0fdb` arrays)
 2. Code the encoder in `encoder.hpp` or extend an existing encoder
