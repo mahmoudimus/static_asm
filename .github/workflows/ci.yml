@@ -7,6 +7,59 @@ on:
     branches: [ main, master, develop ]
 
 jobs:
+  # Check code formatting with clang-format
+  format:
+    runs-on: ubuntu-latest
+    name: Format (clang-format)
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install clang-format
+      run: |
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh 18
+        sudo apt-get install -y clang-format-18
+
+    - name: Check formatting
+      run: |
+        find src include -name '*.hpp' -o -name '*.cpp' | xargs clang-format-18 --dry-run --Werror
+
+  # Static analysis with clang-tidy
+  tidy:
+    runs-on: ubuntu-latest
+    name: Static Analysis (clang-tidy)
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Clang 18
+      run: |
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh 18
+        sudo apt-get install -y clang-tidy-18
+
+    - name: Generate compile_commands.json
+      env:
+        CC: clang-18
+        CXX: clang++-18
+      run: |
+        cmake -B build \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+          -DSTATIC_ASM_BUILD_TESTS=ON
+
+    - name: Run clang-tidy
+      run: |
+        # Run clang-tidy on test files (which include the headers)
+        # Filter to only report issues in src/ and include/ directories
+        clang-tidy-18 -p build \
+          --checks='-*,google-build-using-namespace,bugprone-*,modernize-use-override' \
+          --header-filter='.*/(src|include)/.*\.hpp$' \
+          tests/test_main.cpp 2>&1 | grep -E '^(src|include)/' || true
+
   # Linux builds with GCC and Clang
   linux:
     runs-on: ubuntu-latest
@@ -58,8 +111,8 @@ jobs:
       run: |
         cmake -B build \
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-          -DCX_ASSEMBLER_BUILD_TESTS=ON \
-          -DCX_ASSEMBLER_BUILD_EXAMPLES=OFF
+          -DSTATIC_ASM_BUILD_TESTS=ON \
+          -DSTATIC_ASM_BUILD_EXAMPLES=OFF
 
     - name: Build
       run: cmake --build build --config ${{ matrix.build_type }} -j $(nproc)
@@ -85,8 +138,8 @@ jobs:
       run: |
         cmake -B build \
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-          -DCX_ASSEMBLER_BUILD_TESTS=ON \
-          -DCX_ASSEMBLER_BUILD_EXAMPLES=OFF
+          -DSTATIC_ASM_BUILD_TESTS=ON \
+          -DSTATIC_ASM_BUILD_EXAMPLES=OFF
 
     - name: Build
       run: cmake --build build --config ${{ matrix.build_type }} -j $(sysctl -n hw.ncpu)
@@ -112,8 +165,8 @@ jobs:
       run: |
         cmake -B build `
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
-          -DCX_ASSEMBLER_BUILD_TESTS=ON `
-          -DCX_ASSEMBLER_BUILD_EXAMPLES=OFF
+          -DSTATIC_ASM_BUILD_TESTS=ON `
+          -DSTATIC_ASM_BUILD_EXAMPLES=OFF
 
     - name: Build
       run: cmake --build build --config ${{ matrix.build_type }} -j $env:NUMBER_OF_PROCESSORS
@@ -146,8 +199,8 @@ jobs:
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
           -DCMAKE_C_COMPILER=clang-cl `
           -DCMAKE_CXX_COMPILER=clang-cl `
-          -DCX_ASSEMBLER_BUILD_TESTS=ON `
-          -DCX_ASSEMBLER_BUILD_EXAMPLES=OFF
+          -DSTATIC_ASM_BUILD_TESTS=ON `
+          -DSTATIC_ASM_BUILD_EXAMPLES=OFF
 
     - name: Build
       run: cmake --build build --config ${{ matrix.build_type }} -j $env:NUMBER_OF_PROCESSORS
@@ -184,8 +237,8 @@ jobs:
       run: |
         cmake -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-          -DCX_ASSEMBLER_BUILD_TESTS=ON \
-          -DCX_ASSEMBLER_BUILD_EXAMPLES=OFF
+          -DSTATIC_ASM_BUILD_TESTS=ON \
+          -DSTATIC_ASM_BUILD_EXAMPLES=OFF
 
     - name: Build
       shell: msys2 {0}

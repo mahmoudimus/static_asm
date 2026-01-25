@@ -13,17 +13,29 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Export compile commands for IDE support
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Options
-option(STATIC_ASM_BUILD_TESTS "Build tests" ON)
+# Determine if this is a top-level project or included via add_subdirectory/FetchContent
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    set(STATIC_ASM_MAIN_PROJECT ON)
+else()
+    set(STATIC_ASM_MAIN_PROJECT OFF)
+endif()
+
+# Options - tests/examples only build by default for the main project
+option(STATIC_ASM_BUILD_TESTS "Build tests" ${STATIC_ASM_MAIN_PROJECT})
 option(STATIC_ASM_BUILD_EXAMPLES "Build examples (requires Clang)" OFF)
 
 # Create header-only library interface
 add_library(static_asm INTERFACE)
+add_library(static_asm::static_asm ALIAS static_asm)
+
 target_include_directories(static_asm INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
+
+# Require C++20
+target_compile_features(static_asm INTERFACE cxx_std_20)
 
 # Detect if using clang-cl (Clang with MSVC frontend)
 set(USING_CLANG_CL FALSE)
@@ -152,4 +164,48 @@ if(STATIC_ASM_BUILD_EXAMPLES)
         target_compile_options(static_asm_example_opaque_compute PRIVATE /O2)
         target_compile_options(static_asm_example_shellcode PRIVATE /O2)
     endif()
+endif()
+
+# Installation rules (only for main project)
+if(STATIC_ASM_MAIN_PROJECT)
+    include(GNUInstallDirs)
+    include(CMakePackageConfigHelpers)
+
+    # Install headers
+    install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    install(DIRECTORY src/static_asm/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/static_asm)
+
+    # Install target
+    install(TARGETS static_asm
+        EXPORT static_asm-targets
+        INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+
+    # Install export targets
+    install(EXPORT static_asm-targets
+        FILE static_asm-targets.cmake
+        NAMESPACE static_asm::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/static_asm
+    )
+
+    # Generate package config
+    configure_package_config_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/static_asm-config.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/static_asm-config.cmake
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/static_asm
+    )
+
+    # Generate version file
+    write_basic_package_version_file(
+        ${CMAKE_CURRENT_BINARY_DIR}/static_asm-config-version.cmake
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY SameMajorVersion
+    )
+
+    # Install config files
+    install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/static_asm-config.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/static_asm-config-version.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/static_asm
+    )
 endif()

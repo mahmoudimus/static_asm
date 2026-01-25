@@ -313,6 +313,63 @@ constexpr auto epilogue = core::assemble(
 constexpr auto full_function = core::assemble(prologue, epilogue);
 ```
 
+## Installation
+
+### Option 1: CMake FetchContent (Recommended)
+
+Add to your `CMakeLists.txt`:
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(
+    static_asm
+    GIT_REPOSITORY https://github.com/mahmoudimus/static_asm.git
+    GIT_TAG v1.0.0  # or specific commit
+)
+FetchContent_MakeAvailable(static_asm)
+
+target_link_libraries(your_target PRIVATE static_asm::static_asm)
+```
+
+### Option 2: CMake add_subdirectory
+
+Clone or add as a git submodule:
+
+```bash
+git submodule add https://github.com/mahmoudimus/static_asm.git external/static_asm
+```
+
+Then in your `CMakeLists.txt`:
+
+```cmake
+add_subdirectory(external/static_asm)
+target_link_libraries(your_target PRIVATE static_asm::static_asm)
+```
+
+When included via `add_subdirectory` or `FetchContent`, only the `static_asm::static_asm` interface library target is added to your project. Tests and examples are not built unless explicitly enabled with `-DSTATIC_ASM_BUILD_TESTS=ON`.
+
+### Option 3: Single Header
+
+Download `static_asm.hpp` from the [releases page](https://github.com/mahmoudimus/static_asm/releases) and include it directly:
+
+```cpp
+#include "static_asm.hpp"
+```
+
+### Option 4: System Install
+
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --install build --prefix /usr/local
+```
+
+Then use `find_package`:
+
+```cmake
+find_package(static_asm REQUIRED)
+target_link_libraries(your_target PRIVATE static_asm::static_asm)
+```
+
 ## Build
 
 ```bash
@@ -428,3 +485,135 @@ This project is based on [cx_assembler](https://github.com/Midi12/cx_assembler) 
 ## Changelog
 
 See [changelog](CHANGELOG.md)
+
+---
+
+# Techniques for Creating a Single-Header Library
+
+No automatic tool can reliably convert an arbitrary multi-file C++ library into a clean, header-only version without some manual preparation. The following techniques help ensure your library can be successfully amalgamated into a single header file while remaining correct, maintainable, and standards-compliant.
+
+## 1. Avoid `using namespace` in source files
+
+`using namespace` at file scope in `.cpp` files is dangerous when those files are later included in a header — it pollutes the global namespace for every translation unit that includes your header.
+
+**Recommended patterns instead:**
+
+```cpp
+// Preferred: wrap implementation in namespace
+namespace MyLib {
+    Foo::Foo() {
+        // ...
+    }
+}
+```
+
+or
+
+```cpp
+// Explicit qualification (more verbose but very clear)
+MyLib::Foo::Foo() {
+    // ...
+}
+```
+
+## 2. Place internal / private APIs in a nested namespace
+
+Public APIs should live in the main namespace. Everything that is **not** intended for end-users should be hidden in a nested namespace such as `detail` or `impl`.
+
+**Common conventions:**
+
+```cpp
+namespace MyLib {
+    namespace detail {           // very widely used
+        // internal classes, functions, etc.
+    }
+}
+```
+
+or
+
+```cpp
+namespace MyLib::impl {          // shorter, also common
+    // internal implementation details
+}
+```
+
+C++17 and later support inline nested namespace definitions, which are cleaner:
+
+```cpp
+namespace MyLib::detail {
+    class InternalHelper { /* ... */ };
+}
+```
+
+## 3. Convert file-scope static data to `static inline` class members
+
+File-scope `static` variables defined in `.cpp` files become problematic in a header-only world (multiple definitions, ODR violations).
+
+**Modern (C++17+) solution:**
+
+```cpp
+// Before (in .cpp)
+namespace MyLib {
+    static int s_counter = 0;
+
+    int next_id() {
+        return ++s_counter;
+    }
+}
+```
+
+```cpp
+// After (safe for header)
+namespace MyLib::detail {
+    struct Globals {
+        static inline int counter = 0;
+    };
+}
+
+inline int MyLib::next_id() {
+    return ++detail::Globals::counter;
+}
+```
+
+The `static inline` variable is guaranteed to have a single definition even when included multiple times.
+
+## 4. Mark functions defined outside class bodies as `inline`
+
+Any function, member function, constructor, or destructor whose **body** appears in the header (but not inside the class definition) **must** be marked `inline` to avoid One Definition Rule (ODR) violations.
+
+Because many amalgamation scripts are purely textual and do not parse C++ semantics, a common convention is to use a placeholder macro (e.g. `inline_t`) during development:
+
+```cpp
+// MyLib.h (or common header)
+#define inline_t   /* empty during normal builds */
+
+// MyLib.cpp (during development)
+namespace MyLib::detail {
+    inline_t void Helper::do_work() {
+        // implementation
+    }
+}
+```
+
+During amalgamation, the tool replaces `inline_t` with `inline`:
+
+```cpp
+// After amalgamation / transformation
+inline void MyLib::detail::Helper::do_work() {
+    // ...
+}
+```
+
+You can choose any macro name you prefer (e.g. `MYLIB_INLINE`, `INLINE_IMP`, etc.) and configure your amalgamation script accordingly.
+
+## Summary — The Four Key Rules
+
+1. **Never** write `using namespace …` at namespace/file scope in implementation files.
+2. Put all internal/non-public symbols into a nested namespace (`detail` / `impl`).
+3. Replace file-scope `static` data with `static inline` members of a struct/class.
+4. Mark out-of-line function bodies with an `inline` marker macro (replaced during amalgamation).
+
+Following these four practices makes the transition to a single-header distribution much smoother and far less error-prone — even when using purely text-based amalgamation tools.
+
+Happy header-only library writing!

@@ -1,0 +1,5 @@
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/static_asm-targets.cmake")
+
+check_required_components(static_asm)
