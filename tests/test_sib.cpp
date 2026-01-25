@@ -1,5 +1,5 @@
-#include <gtest/gtest.h>
 #include "static_asm.hpp"
+#include <gtest/gtest.h>
 
 using namespace static_asm;
 using namespace static_asm::x86;
@@ -363,6 +363,6 @@ TEST(SIBTests, ConstexprEvaluation) {
     constexpr auto add_sib = add(eax, dword_ptr(rbx + rcx * s4));
 
     EXPECT_EQ(mov_sib.size(), 3u);
-    EXPECT_EQ(lea_sib.size(), 4u);  // REX.W prefix
+    EXPECT_EQ(lea_sib.size(), 4u); // REX.W prefix
     EXPECT_EQ(add_sib.size(), 3u);
 }

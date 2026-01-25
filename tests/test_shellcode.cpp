@@ -1,5 +1,5 @@
-#include <gtest/gtest.h>
 #include "static_asm.hpp"
+#include <gtest/gtest.h>
 
 using namespace static_asm;
 using namespace static_asm::x86;
@@ -10,8 +10,10 @@ using namespace static_asm::x86::instructions;
 template<typename T, std::size_t N1, std::size_t N2>
 constexpr std::array<T, N1 + N2> concat(const std::array<T, N1>& a, const std::array<T, N2>& b) {
     std::array<T, N1 + N2> result{};
-    for (std::size_t i = 0; i < N1; ++i) result[i] = a[i];
-    for (std::size_t i = 0; i < N2; ++i) result[N1 + i] = b[i];
+    for (std::size_t i = 0; i < N1; ++i)
+        result[i] = a[i];
+    for (std::size_t i = 0; i < N2; ++i)
+        result[N1 + i] = b[i];
     return result;
 }
 
@@ -19,13 +21,13 @@ constexpr std::array<T, N1 + N2> concat(const std::array<T, N1>& a, const std::a
 // Tests: sub, mov with auto-movabs, xor with extended registers, call
 constexpr auto build_loader_shellcode(std::uint64_t dll_base, std::uint64_t entry_point) {
     return core::assemble(
-        sub(rsp, 0x28),              // sub rsp, 0x28 - shadow space
-        mov(rcx, dll_base),          // mov rcx, imm64 (auto movabs)
-        mov(rdx, 1),                 // mov rdx, 1
-        xor_(r8, r8),                // xor r8, r8
-        mov(rax, entry_point),       // mov rax, imm64 (auto movabs)
-        call(rax),                   // call rax
-        jmp(here)                    // jmp $ (infinite loop)
+        sub(rsp, 0x28), // sub rsp, 0x28 - shadow space
+        mov(rcx, dll_base), // mov rcx, imm64 (auto movabs)
+        mov(rdx, 1), // mov rdx, 1
+        xor_(r8, r8), // xor r8, r8
+        mov(rax, entry_point), // mov rax, imm64 (auto movabs)
+        call(rax), // call rax
+        jmp(here) // jmp $ (infinite loop)
     );
 }
 
@@ -39,14 +41,14 @@ TEST(ShellcodeTests, DllLoaderStructure) {
     EXPECT_EQ(shellcode.size(), 41u);
 
     // Verify sub rsp, 0x28 (7 bytes: 48 81 EC 28 00 00 00)
-    EXPECT_EQ(shellcode[0], 0x48);  // REX.W
-    EXPECT_EQ(shellcode[1], 0x81);  // opcode
-    EXPECT_EQ(shellcode[2], 0xEC);  // ModR/M
-    EXPECT_EQ(shellcode[3], 0x28);  // imm32 low byte
+    EXPECT_EQ(shellcode[0], 0x48); // REX.W
+    EXPECT_EQ(shellcode[1], 0x81); // opcode
+    EXPECT_EQ(shellcode[2], 0xEC); // ModR/M
+    EXPECT_EQ(shellcode[3], 0x28); // imm32 low byte
 
     // Verify mov rcx, imm64 starts at offset 7 (10 bytes: 48 B9 ...)
-    EXPECT_EQ(shellcode[7], 0x48);  // REX.W
-    EXPECT_EQ(shellcode[8], 0xB9);  // mov rcx, imm64 opcode (B8 + 1)
+    EXPECT_EQ(shellcode[7], 0x48); // REX.W
+    EXPECT_EQ(shellcode[8], 0xB9); // mov rcx, imm64 opcode (B8 + 1)
 
     // Verify mov rdx, 1 starts at offset 17 (7 bytes: 48 C7 C2 01 00 00 00)
     EXPECT_EQ(shellcode[17], 0x48); // REX.W
@@ -76,18 +78,18 @@ TEST(ShellcodeTests, JmpExtendedRegister) {
     // Test jmp r8 encoding
     constexpr auto code = jmp(r8);
     EXPECT_EQ(code.size(), 3u);
-    EXPECT_EQ(code[0], 0x41);  // REX.B
-    EXPECT_EQ(code[1], 0xFF);  // jmp opcode
-    EXPECT_EQ(code[2], 0xE0);  // ModR/M (r8)
+    EXPECT_EQ(code[0], 0x41); // REX.B
+    EXPECT_EQ(code[1], 0xFF); // jmp opcode
+    EXPECT_EQ(code[2], 0xE0); // ModR/M (r8)
 }
 
 TEST(ShellcodeTests, CallExtendedRegister) {
     // Test call r8 encoding
     constexpr auto code = call(r8);
     EXPECT_EQ(code.size(), 3u);
-    EXPECT_EQ(code[0], 0x41);  // REX.B
-    EXPECT_EQ(code[1], 0xFF);  // call opcode
-    EXPECT_EQ(code[2], 0xD0);  // ModR/M (r8)
+    EXPECT_EQ(code[0], 0x41); // REX.B
+    EXPECT_EQ(code[1], 0xFF); // call opcode
+    EXPECT_EQ(code[2], 0xD0); // ModR/M (r8)
 }
 
 TEST(ShellcodeTests, MovAutoMovabs) {
@@ -97,8 +99,8 @@ TEST(ShellcodeTests, MovAutoMovabs) {
 
     // Should be movabs encoding: REX.W + B9 + 8 bytes = 10 bytes
     EXPECT_EQ(code.size(), 10u);
-    EXPECT_EQ(code[0], 0x48);  // REX.W
-    EXPECT_EQ(code[1], 0xB9);  // mov rcx, imm64 (B8 + 1)
+    EXPECT_EQ(code[0], 0x48); // REX.W
+    EXPECT_EQ(code[1], 0xB9); // mov rcx, imm64 (B8 + 1)
 
     // Verify the immediate value is encoded correctly (little-endian)
     EXPECT_EQ(code[2], 0x00);

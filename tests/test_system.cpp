@@ -1,5 +1,5 @@
-#include <gtest/gtest.h>
 #include "static_asm.hpp"
+#include <gtest/gtest.h>
 
 using namespace static_asm;
 using namespace static_asm::x86;
@@ -252,16 +252,15 @@ TEST(ShellcodePatterns, LinuxSyscall32) {
     constexpr auto shellcode = core::assemble(
         mov(eax, 1),
         mov(ebx, 0),
-        int_0x80()
-    );
+        int_0x80());
 
     // mov eax, 1: B8 01 00 00 00 (5 bytes, optimized B8+rd form)
     // mov ebx, 0: BB 00 00 00 00 (5 bytes, optimized B8+rd form)
     // int 0x80:   CD 80 (2 bytes)
     EXPECT_EQ(shellcode.size(), 12u);
-    EXPECT_EQ(shellcode[0], 0xB8);   // mov eax opcode
-    EXPECT_EQ(shellcode[10], 0xCD);  // int opcode
-    EXPECT_EQ(shellcode[11], 0x80);  // interrupt vector
+    EXPECT_EQ(shellcode[0], 0xB8); // mov eax opcode
+    EXPECT_EQ(shellcode[10], 0xCD); // int opcode
+    EXPECT_EQ(shellcode[11], 0x80); // interrupt vector
 }
 
 TEST(ShellcodePatterns, LinuxSyscall64) {
@@ -272,8 +271,7 @@ TEST(ShellcodePatterns, LinuxSyscall64) {
     constexpr auto shellcode = core::assemble(
         mov(rax, 60),
         xor_(rdi, rdi),
-        syscall_()
-    );
+        syscall_());
 
     // mov rax, 60: 48 C7 C0 3C 00 00 00
     // xor rdi, rdi: 48 31 FF
@@ -300,8 +298,7 @@ TEST(ShellcodePatterns, NopSled) {
         nop(),
         nop(),
         nop(),
-        int3()
-    );
+        int3());
 
     // 90 90 90 90 CC
     EXPECT_EQ(sled.size(), 5u);

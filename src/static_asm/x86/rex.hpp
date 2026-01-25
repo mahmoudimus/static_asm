@@ -2,7 +2,8 @@
 
 namespace static_asm::x86 {
 
-    template <typename Reg1, typename Reg2> requires Register<Reg1> && Register<Reg2>
+    template<typename Reg1, typename Reg2>
+        requires Register<Reg1> && Register<Reg2>
     inline constexpr std::uint8_t encode_rex() {
         return (0b0100 << 4) // fixed value
                + ((Reg1::size >= 64 || Reg2::size >= 64) << 3) // Rex.W
@@ -11,12 +12,14 @@ namespace static_asm::x86 {
                + (Reg1::extended ? 1 : 0); // Rex.B
     }
 
-    template <typename Mem, typename Reg> requires Memory<Mem> && Register<typename Mem::value_type> && Register<Reg>
+    template<typename Mem, typename Reg>
+        requires Memory<Mem> && Register<typename Mem::value_type> && Register<Reg>
     inline constexpr std::uint8_t encode_rex() {
         return encode_rex<typename Mem::value_type, Reg>();
     }
 
-    template <typename Reg, typename Mem> requires Register<Reg> && Memory<Mem> && Register<typename Mem::value_type>
+    template<typename Reg, typename Mem>
+        requires Register<Reg> && Memory<Mem> && Register<typename Mem::value_type>
     inline constexpr std::uint8_t encode_rex() {
         // For (Reg, Mem) order: Reg goes in reg field (REX.R), Mem base goes in r/m field (REX.B)
         // REX.W is based on the register operand size, not the memory base size
@@ -27,7 +30,8 @@ namespace static_asm::x86 {
                + (Mem::value_type::extended ? 1 : 0); // Rex.B - extended memory base
     }
 
-    template <typename Reg1> requires Register<Reg1>
+    template<typename Reg1>
+        requires Register<Reg1>
     inline constexpr std::uint8_t encode_rex() {
         return (0b0100 << 4) // fixed value
                + ((Reg1::size >= 64) << 3) // Rex.W
@@ -36,7 +40,8 @@ namespace static_asm::x86 {
                + (Reg1::extended ? 1 : 0); // Rex.B
     }
 
-    template <typename Mem> requires Memory<Mem>
+    template<typename Mem>
+        requires Memory<Mem>
     inline constexpr std::uint8_t encode_rex() {
         return (0b0100 << 4) // fixed value
                + ((Mem::size >= 64) << 3) // Rex.W
@@ -45,12 +50,14 @@ namespace static_asm::x86 {
                + (0); // Rex.B
     }
 
-    template <typename Imm> requires Immediate<Imm>
+    template<typename Imm>
+        requires Immediate<Imm>
     inline constexpr std::uint8_t encode_rex() {
         return 0; // todo
     }
 
-    template <typename Mem, typename Reg> requires Memory<Mem> && Immediate<typename Mem::value_type> && Register<Reg>
+    template<typename Mem, typename Reg>
+        requires Memory<Mem> && Immediate<typename Mem::value_type> && Register<Reg>
     inline constexpr std::uint8_t encode_rex() {
         return (0b0100 << 4) // fixed value
                + ((Reg::size >= 64) << 3) // Rex.W
@@ -59,7 +66,8 @@ namespace static_asm::x86 {
                + (Reg::extended ? 1 : 0); // Rex.B
     }
 
-    template <typename Reg, typename Mem> requires Register<Reg> && Memory<Mem> && Immediate<typename Mem::value_type>
+    template<typename Reg, typename Mem>
+        requires Register<Reg> && Memory<Mem> && Immediate<typename Mem::value_type>
     inline constexpr std::uint8_t encode_rex() {
         return (0b0100 << 4) // fixed value
                + ((Reg::size >= 64) << 3) // Rex.W
@@ -69,7 +77,8 @@ namespace static_asm::x86 {
     }
 
     // REX prefix with only B bit (no W) - for jmp/call with extended registers
-    template <typename Reg1> requires Register<Reg1>
+    template<typename Reg1>
+        requires Register<Reg1>
     inline constexpr std::uint8_t encode_rex_b_only() {
         return (0b0100 << 4) // fixed value
                + (0 << 3) // Rex.W = 0
@@ -78,38 +87,45 @@ namespace static_asm::x86 {
                + (Reg1::extended ? 1 : 0); // Rex.B
     }
 
-    template <typename Reg1, typename Reg2> requires Register<Reg1> && Register<Reg2>
+    template<typename Reg1, typename Reg2>
+        requires Register<Reg1> && Register<Reg2>
     inline constexpr bool needs_rex() {
         return Reg1::extended || Reg2::extended || Reg1::size >= 64 || Reg2::size >= 64;
     }
 
-    template <typename Reg1> requires Register<Reg1>
+    template<typename Reg1>
+        requires Register<Reg1>
     inline constexpr bool needs_rex() {
         return Reg1::extended || Reg1::size >= 64;
     }
 
     // Check if register is extended (r8-r15) - needs REX.B
-    template <typename Reg1> requires Register<Reg1>
+    template<typename Reg1>
+        requires Register<Reg1>
     inline constexpr bool needs_rex_extended() {
         return Reg1::extended;
     }
 
-    template <typename Mem> requires Memory<Mem> && Register<typename Mem::value_type>
+    template<typename Mem>
+        requires Memory<Mem> && Register<typename Mem::value_type>
     inline constexpr bool needs_rex() {
         return Mem::size >= 64;
     }
 
-    template <typename Imm> requires Immediate<Imm>
+    template<typename Imm>
+        requires Immediate<Imm>
     inline constexpr bool needs_rex() {
         return sizeof(Imm) >= 64;
     }
 
-    template <typename Mem, typename Reg> requires Memory<Mem> && Register<Reg>
+    template<typename Mem, typename Reg>
+        requires Memory<Mem> && Register<Reg>
     inline constexpr bool needs_rex() {
         return Reg::extended || Reg::size >= 64;
     }
 
-    template <typename Reg, typename Mem> requires Register<Reg> && Memory<Mem>
+    template<typename Reg, typename Mem>
+        requires Register<Reg> && Memory<Mem>
     inline constexpr bool needs_rex() {
         return needs_rex<Mem, Reg>();
     }
@@ -123,10 +139,8 @@ namespace static_asm::x86 {
     // - REX.R: Extension of reg field (destination register)
     // - REX.X: Extension of index field in SIB
     // - REX.B: Extension of base field in SIB (or r/m field)
-    template <typename Reg, typename Base, typename Index>
-        requires Register<Reg>
-              && (Register<Base> || std::same_as<Base, no_base_t>)
-              && (Register<Index> || std::same_as<Index, no_index_t>)
+    template<typename Reg, typename Base, typename Index>
+        requires Register<Reg> && (Register<Base> || std::same_as<Base, no_base_t>) && (Register<Index> || std::same_as<Index, no_index_t>)
     inline constexpr std::uint8_t encode_rex_sib() {
         constexpr bool rex_w = (Reg::size >= 64);
         constexpr bool rex_r = Reg::extended;
@@ -143,18 +157,12 @@ namespace static_asm::x86 {
             return false;
         }();
 
-        return (0b0100 << 4)
-             | (rex_w << 3)
-             | (rex_r << 2)
-             | (rex_x << 1)
-             | (rex_b);
+        return (0b0100 << 4) | (rex_w << 3) | (rex_r << 2) | (rex_x << 1) | (rex_b);
     }
 
     // Check if REX is needed for SIB addressing
-    template <typename Reg, typename Base, typename Index>
-        requires Register<Reg>
-              && (Register<Base> || std::same_as<Base, no_base_t>)
-              && (Register<Index> || std::same_as<Index, no_index_t>)
+    template<typename Reg, typename Base, typename Index>
+        requires Register<Reg> && (Register<Base> || std::same_as<Base, no_base_t>) && (Register<Index> || std::same_as<Index, no_index_t>)
     inline constexpr bool needs_rex_sib() {
         constexpr bool need_w = (Reg::size >= 64);
         constexpr bool need_r = Reg::extended;
@@ -175,16 +183,16 @@ namespace static_asm::x86 {
     }
 
     // REX prefix for SIB with SIBMemory operand type
-    template <typename Reg, typename SIBMem>
+    template<typename Reg, typename SIBMem>
         requires Register<Reg> && SIBMemory<SIBMem>
     inline constexpr std::uint8_t encode_rex_sib_mem() {
         return encode_rex_sib<Reg, typename SIBMem::base_type, typename SIBMem::index_type>();
     }
 
-    template <typename Reg, typename SIBMem>
+    template<typename Reg, typename SIBMem>
         requires Register<Reg> && SIBMemory<SIBMem>
     inline constexpr bool needs_rex_sib_mem() {
         return needs_rex_sib<Reg, typename SIBMem::base_type, typename SIBMem::index_type>();
     }
 
-}
+} // namespace static_asm::x86

@@ -1,5 +1,5 @@
-#include <gtest/gtest.h>
 #include "static_asm.hpp"
+#include <gtest/gtest.h>
 // Using internal::make_array from static_asm
 
 using namespace static_asm;
@@ -181,5 +181,5 @@ TEST(BswapInstructions, ConstexprEvaluation) {
     static_assert(bswap_rax[1] == 0x0F, "BSWAP RAX: second byte should be 0x0F");
     static_assert(bswap_rax[2] == 0xC8, "BSWAP RAX: third byte should be 0xC8");
 
-    EXPECT_TRUE(true);  // Test passes if compilation succeeds
+    EXPECT_TRUE(true); // Test passes if compilation succeeds
 }

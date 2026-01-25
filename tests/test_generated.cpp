@@ -1,5 +1,5 @@
-#include <gtest/gtest.h>
 #include "static_asm.hpp"
+#include <gtest/gtest.h>
 
 // Auto-generated exhaustive tests from x86reference.xml
 
@@ -7,7 +7,6 @@ using namespace static_asm;
 using namespace static_asm::x86;
 using namespace static_asm::x86::registers;
 using namespace static_asm::x86::instructions;
-
 
 TEST(GeneratedAluTests, ADD_Reg32_Reg32) {
     // ADD eax, ecx
@@ -28,7 +27,6 @@ TEST(GeneratedAluTests, ADD_Reg64_Imm32) {
     EXPECT_GE(result.size(), 6u);
 }
 
-
 TEST(GeneratedAluTests, SUB_Reg32_Reg32) {
     // SUB eax, ecx
     auto result = sub(eax, ecx);
@@ -47,7 +45,6 @@ TEST(GeneratedAluTests, SUB_Reg64_Imm32) {
     auto result = sub(rax, 0x12345678);
     EXPECT_GE(result.size(), 6u);
 }
-
 
 TEST(GeneratedAluTests, AND_Reg32_Reg32) {
     // AND eax, ecx
@@ -68,7 +65,6 @@ TEST(GeneratedAluTests, AND_Reg64_Imm32) {
     EXPECT_GE(result.size(), 6u);
 }
 
-
 TEST(GeneratedAluTests, OR_Reg32_Reg32) {
     // OR eax, ecx
     auto result = or_(eax, ecx);
@@ -87,7 +83,6 @@ TEST(GeneratedAluTests, OR_Reg64_Imm32) {
     auto result = or_(rax, 0x12345678);
     EXPECT_GE(result.size(), 6u);
 }
-
 
 TEST(GeneratedAluTests, XOR_Reg32_Reg32) {
     // XOR eax, ecx
@@ -108,7 +103,6 @@ TEST(GeneratedAluTests, XOR_Reg64_Imm32) {
     EXPECT_GE(result.size(), 6u);
 }
 
-
 TEST(GeneratedAluTests, CMP_Reg32_Reg32) {
     // CMP eax, ecx
     auto result = cmp(eax, ecx);
@@ -127,7 +121,6 @@ TEST(GeneratedAluTests, CMP_Reg64_Imm32) {
     auto result = cmp(rax, 0x12345678);
     EXPECT_GE(result.size(), 6u);
 }
-
 
 TEST(GeneratedAluTests, ADC_Reg32_Reg32) {
     // ADC eax, ecx
@@ -148,7 +141,6 @@ TEST(GeneratedAluTests, ADC_Reg64_Imm32) {
     EXPECT_GE(result.size(), 6u);
 }
 
-
 TEST(GeneratedAluTests, SBB_Reg32_Reg32) {
     // SBB eax, ecx
     auto result = sbb(eax, ecx);
@@ -167,7 +159,6 @@ TEST(GeneratedAluTests, SBB_Reg64_Imm32) {
     auto result = sbb(rax, 0x12345678);
     EXPECT_GE(result.size(), 6u);
 }
-
 
 TEST(GeneratedMovTests, MOV_Reg32_Reg32) {
     auto result = mov(eax, ecx);
@@ -193,7 +184,6 @@ TEST(GeneratedMovTests, MOV_ExtendedReg) {
     // Should have REX prefix with R and B bits
 }
 
-
 TEST(GeneratedJmpTests, JMP_Rel32) {
     auto result = jmp(0x12345678);
     EXPECT_EQ(result.size(), 5u);
@@ -213,7 +203,6 @@ TEST(GeneratedJmpTests, JMP_ExtendedReg) {
     EXPECT_EQ(result[1], 0xFF);
 }
 
-
 TEST(GeneratedCallTests, CALL_Rel32) {
     auto result = call(0x12345678);
     EXPECT_EQ(result.size(), 5u);
@@ -232,7 +221,6 @@ TEST(GeneratedCallTests, CALL_ExtendedReg) {
     EXPECT_EQ(result[0], 0x41); // REX.B
 }
 
-
 TEST(GeneratedStackTests, PUSH_Reg64) {
     auto result = push(rax);
     EXPECT_EQ(result.size(), 1u);
@@ -246,7 +234,6 @@ TEST(GeneratedStackTests, PUSH_ExtendedReg) {
     EXPECT_EQ(result[1], 0x50);
 }
 
-
 TEST(GeneratedStackTests, POP_Reg64) {
     auto result = pop(rax);
     EXPECT_EQ(result.size(), 1u);
@@ -259,66 +246,55 @@ TEST(GeneratedStackTests, POP_ExtendedReg) {
     EXPECT_EQ(result[0], 0x41); // REX.B
 }
 
-
 TEST(GeneratedJccTests, JZ_Rel8) {
     auto result = jz(0x10);
     EXPECT_EQ(result.size(), 2u);
 }
-
 
 TEST(GeneratedJccTests, JNZ_Rel8) {
     auto result = jnz(0x10);
     EXPECT_EQ(result.size(), 2u);
 }
 
-
 TEST(GeneratedJccTests, JB_Rel8) {
     auto result = jb(0x10);
     EXPECT_EQ(result.size(), 2u);
 }
-
 
 TEST(GeneratedJccTests, JNB_Rel8) {
     auto result = jnb(0x10);
     EXPECT_EQ(result.size(), 2u);
 }
 
-
 TEST(GeneratedJccTests, JBE_Rel8) {
     auto result = jbe(0x10);
     EXPECT_EQ(result.size(), 2u);
 }
-
 
 TEST(GeneratedJccTests, JNBE_Rel8) {
     auto result = jnbe(0x10);
     EXPECT_EQ(result.size(), 2u);
 }
 
-
 TEST(GeneratedJccTests, JL_Rel8) {
     auto result = jl(0x10);
     EXPECT_EQ(result.size(), 2u);
 }
-
 
 TEST(GeneratedJccTests, JNL_Rel8) {
     auto result = jnl(0x10);
     EXPECT_EQ(result.size(), 2u);
 }
 
-
 TEST(GeneratedJccTests, JLE_Rel8) {
     auto result = jle(0x10);
     EXPECT_EQ(result.size(), 2u);
 }
 
-
 TEST(GeneratedJccTests, JNLE_Rel8) {
     auto result = jnle(0x10);
     EXPECT_EQ(result.size(), 2u);
 }
-
 
 TEST(GeneratedNopTests, NOP_Single) {
     auto result = nop();

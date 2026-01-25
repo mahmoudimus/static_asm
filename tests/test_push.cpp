@@ -1,5 +1,5 @@
-#include <gtest/gtest.h>
 #include "static_asm.hpp"
+#include <gtest/gtest.h>
 // Using internal::make_array from static_asm
 
 using namespace static_asm;

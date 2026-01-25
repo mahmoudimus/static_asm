@@ -1,5 +1,5 @@
-#include <gtest/gtest.h>
 #include "static_asm.hpp"
+#include <gtest/gtest.h>
 
 using namespace static_asm;
 using namespace static_asm::x86;
@@ -229,45 +229,41 @@ TEST(StringInstructions, RepStos) {
 TEST(StringInstructions, AssembleStringOperations) {
     // Test assembling a simple memcpy-like sequence
     constexpr auto memcpy_like = core::assemble(
-        rep_movsb()
-    );
+        rep_movsb());
     EXPECT_EQ(memcpy_like, (internal::make_array<std::uint8_t>(0xF3, 0xA4)));
 
     // Test assembling a strlen-like sequence (REPNE SCASB)
     constexpr auto strlen_like = core::assemble(
-        repne_scasb()
-    );
+        repne_scasb());
     EXPECT_EQ(strlen_like, (internal::make_array<std::uint8_t>(0xF2, 0xAE)));
 
     // Test assembling a memset-like sequence
     constexpr auto memset_like = core::assemble(
-        rep_stosb()
-    );
+        rep_stosb());
     EXPECT_EQ(memset_like, (internal::make_array<std::uint8_t>(0xF3, 0xAA)));
 
     // Test assembling memcmp-like sequence
     constexpr auto memcmp_like = core::assemble(
-        repe_cmpsb()
-    );
+        repe_cmpsb());
     EXPECT_EQ(memcmp_like, (internal::make_array<std::uint8_t>(0xF3, 0xA6)));
 }
 
 TEST(StringInstructions, AssembleComplexSequence) {
     // A more complex sequence combining string instructions with regular instructions
     constexpr auto code = core::assemble(
-        xor_(rax, rax),        // Clear rax
-        stosq(),               // Store qword
-        movsb(),               // Move byte
-        lodsb(),               // Load byte
-        cmpsb()                // Compare byte
+        xor_(rax, rax), // Clear rax
+        stosq(), // Store qword
+        movsb(), // Move byte
+        lodsb(), // Load byte
+        cmpsb() // Compare byte
     );
 
     // Expected: 48 31 C0 (xor rax, rax) + 48 AB (stosq) + A4 (movsb) + AC (lodsb) + A6 (cmpsb)
     EXPECT_EQ(code, (internal::make_array<std::uint8_t>(
-        0x48, 0x31, 0xC0,  // xor rax, rax
-        0x48, 0xAB,        // stosq
-        0xA4,              // movsb
-        0xAC,              // lodsb
-        0xA6               // cmpsb
-    )));
+                        0x48, 0x31, 0xC0, // xor rax, rax
+                        0x48, 0xAB, // stosq
+                        0xA4, // movsb
+                        0xAC, // lodsb
+                        0xA6 // cmpsb
+                        )));
 }

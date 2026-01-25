@@ -23,13 +23,13 @@ constexpr auto build_loader_shellcode(std::uint64_t dll_base, std::uint64_t entr
     // All instructions use the library's native encoding
     // mov() automatically detects when movabs encoding is needed for 64-bit immediates
     return core::assemble(
-        sub(rsp, 0x28),              // sub rsp, 0x28 - shadow space for Windows x64 ABI
-        mov(rcx, dll_base),          // mov rcx, dllBase (hinstDLL parameter) - auto uses movabs
-        mov(rdx, 1),                 // mov rdx, 1 (DLL_PROCESS_ATTACH)
-        xor_(r8, r8),                // xor r8, r8 (lpvReserved = NULL)
-        mov(rax, entry_point),       // mov rax, entryPoint - auto uses movabs
-        call(rax),                   // call rax
-        jmp(here)                    // jmp $ (infinite loop)
+        sub(rsp, 0x28), // sub rsp, 0x28 - shadow space for Windows x64 ABI
+        mov(rcx, dll_base), // mov rcx, dllBase (hinstDLL parameter) - auto uses movabs
+        mov(rdx, 1), // mov rdx, 1 (DLL_PROCESS_ATTACH)
+        xor_(r8, r8), // xor r8, r8 (lpvReserved = NULL)
+        mov(rax, entry_point), // mov rax, entryPoint - auto uses movabs
+        call(rax), // call rax
+        jmp(here) // jmp $ (infinite loop)
     );
 }
 
@@ -47,13 +47,18 @@ int main() {
     std::cout << std::hex << std::setfill('0');
 
     // Print as C array
-    std::cout << "const uint8_t shellcode[] = {" << std::endl << "    ";
+    std::cout << "const uint8_t shellcode[] = {" << std::endl
+              << "    ";
     for (size_t i = 0; i < shellcode.size(); ++i) {
         std::cout << "0x" << std::setw(2) << static_cast<int>(shellcode[i]);
-        if (i < shellcode.size() - 1) std::cout << ", ";
-        if ((i + 1) % 12 == 0 && i < shellcode.size() - 1) std::cout << std::endl << "    ";
+        if (i < shellcode.size() - 1)
+            std::cout << ", ";
+        if ((i + 1) % 12 == 0 && i < shellcode.size() - 1)
+            std::cout << std::endl
+                      << "    ";
     }
-    std::cout << std::endl << "};" << std::endl;
+    std::cout << std::endl
+              << "};" << std::endl;
 
     std::cout << std::dec << std::endl;
     std::cout << "Disassembly:" << std::endl;

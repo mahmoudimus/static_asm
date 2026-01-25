@@ -8,23 +8,22 @@ namespace static_asm::x86 {
     // Encode scale value to 2-bit field
     inline constexpr std::uint8_t encode_scale(int scale) {
         switch (scale) {
-            case 1: return 0b00;
-            case 2: return 0b01;
-            case 4: return 0b10;
-            case 8: return 0b11;
-            default: return 0; // Should not happen with proper constraints
+        case 1: return 0b00;
+        case 2: return 0b01;
+        case 4: return 0b10;
+        case 8: return 0b11;
+        default: return 0; // Should not happen with proper constraints
         }
     }
 
     // SIB byte format: [Scale:2][Index:3][Base:3]
     // Encode SIB byte for general SIB addressing
-    template <typename Base, typename Index, int Scale>
-        requires (Register<Base> || std::same_as<Base, no_base_t>)
-              && (Register<Index> || std::same_as<Index, no_index_t>)
+    template<typename Base, typename Index, int Scale>
+        requires(Register<Base> || std::same_as<Base, no_base_t>) && (Register<Index> || std::same_as<Index, no_index_t>)
     inline constexpr std::uint8_t encode_sib(const Base& base, const Index& index) {
         std::uint8_t scale_bits = encode_scale(Scale);
-        std::uint8_t index_bits = 0b100;  // Default: no index (RSP encoding)
-        std::uint8_t base_bits = 0b101;   // Default: no base (disp32 only)
+        std::uint8_t index_bits = 0b100; // Default: no index (RSP encoding)
+        std::uint8_t base_bits = 0b101; // Default: no base (disp32 only)
 
         if constexpr (Register<Index>) {
             index_bits = static_cast<std::uint8_t>(index.id()) & 0b111;
@@ -38,16 +37,15 @@ namespace static_asm::x86 {
     }
 
     // Overload for SIB memory operand
-    template <typename SIBMem>
+    template<typename SIBMem>
         requires SIBMemory<SIBMem>
     inline constexpr std::uint8_t encode_sib(const SIBMem& mem) {
         return encode_sib<typename SIBMem::base_type, typename SIBMem::index_type, SIBMem::scale>(
-            mem.base(), mem.index()
-        );
+            mem.base(), mem.index());
     }
 
     // Legacy function for disp32-only addressing (preserved for compatibility)
-    template <typename Op1, typename Op2>
+    template<typename Op1, typename Op2>
     inline constexpr std::uint8_t encode_sib_nodisp(const Op1& op1, const Op2& op2) {
         return (static_cast<std::uint8_t>(0b00) << 6) // Scale = 1
                + ((static_cast<std::uint8_t>(0b100) & 0b111) << 3) // index = RSP (no index)
@@ -55,7 +53,7 @@ namespace static_asm::x86 {
     }
 
     // Check if REX.X is needed (index register is r8-r15)
-    template <typename Index>
+    template<typename Index>
         requires Register<Index> || std::same_as<Index, no_index_t>
     inline constexpr bool needs_rex_x() {
         if constexpr (Register<Index>) {
@@ -65,7 +63,7 @@ namespace static_asm::x86 {
     }
 
     // Check if REX.B is needed for SIB base (base register is r8-r15)
-    template <typename Base>
+    template<typename Base>
         requires Register<Base> || std::same_as<Base, no_base_t>
     inline constexpr bool needs_rex_b_sib() {
         if constexpr (Register<Base>) {
@@ -74,4 +72,4 @@ namespace static_asm::x86 {
         return false;
     }
 
-}
+} // namespace static_asm::x86

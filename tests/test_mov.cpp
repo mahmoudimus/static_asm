@@ -1,5 +1,5 @@
-#include <gtest/gtest.h>
 #include "static_asm.hpp"
+#include <gtest/gtest.h>
 // Using internal::make_array from static_asm
 
 using namespace static_asm;
@@ -30,17 +30,17 @@ TEST(MovInstructions, RegisterToMemory) {
 
 TEST(MovInstructions, ImmediateToRegister) {
     // Uses optimized B0+rb/B8+rd encoding (shorter than C6/C7 ModR/M form)
-    EXPECT_EQ(mov(cl, 12), (internal::make_array<std::uint8_t>(0xB1, 0x0C)));                         // B0+1 ib
-    EXPECT_EQ(mov(cx, 12), (internal::make_array<std::uint8_t>(0x66, 0xB9, 0x0C, 0x00)));             // 66 B8+1 iw
-    EXPECT_EQ(mov(ecx, 12), (internal::make_array<std::uint8_t>(0xB9, 0x0C, 0x00, 0x00, 0x00)));      // B8+1 id
+    EXPECT_EQ(mov(cl, 12), (internal::make_array<std::uint8_t>(0xB1, 0x0C))); // B0+1 ib
+    EXPECT_EQ(mov(cx, 12), (internal::make_array<std::uint8_t>(0x66, 0xB9, 0x0C, 0x00))); // 66 B8+1 iw
+    EXPECT_EQ(mov(ecx, 12), (internal::make_array<std::uint8_t>(0xB9, 0x0C, 0x00, 0x00, 0x00))); // B8+1 id
     // 64-bit still uses C7 form (sign-extended imm32 is shorter than 10-byte movabs)
     EXPECT_EQ(mov(rcx, 12), (internal::make_array<std::uint8_t>(0x48, 0xC7, 0xC1, 0x0C, 0x00, 0x00, 0x00)));
 }
 
 TEST(MovInstructions, ExtendedRegisters) {
     // Extended registers use REX prefix with B0+rb/B8+rd encoding
-    EXPECT_EQ(mov(r8b, 12), (internal::make_array<std::uint8_t>(0x41, 0xB0, 0x0C)));                  // REX.B B0 ib
-    EXPECT_EQ(mov(r8w, 12), (internal::make_array<std::uint8_t>(0x66, 0x41, 0xB8, 0x0C, 0x00)));      // 66 REX.B B8 iw
+    EXPECT_EQ(mov(r8b, 12), (internal::make_array<std::uint8_t>(0x41, 0xB0, 0x0C))); // REX.B B0 ib
+    EXPECT_EQ(mov(r8w, 12), (internal::make_array<std::uint8_t>(0x66, 0x41, 0xB8, 0x0C, 0x00))); // 66 REX.B B8 iw
     EXPECT_EQ(mov(r8d, 12), (internal::make_array<std::uint8_t>(0x41, 0xB8, 0x0C, 0x00, 0x00, 0x00))); // REX.B B8 id
     // 64-bit still uses C7 form
     EXPECT_EQ(mov(r8, 12), (internal::make_array<std::uint8_t>(0x49, 0xC7, 0xC0, 0x0C, 0x00, 0x00, 0x00)));

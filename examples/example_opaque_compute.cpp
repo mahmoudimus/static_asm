@@ -8,7 +8,6 @@ using namespace static_asm::x86::registers;
 using namespace static_asm::x86::instructions;
 
 int main() {
-
     std::cout << "this program still returns 12" << std::endl;
 
     constexpr auto code = core::assemble(
@@ -16,8 +15,7 @@ int main() {
         mov(eax, 0x0C),
         add(eax, 0xff),
         adc(eax, 0x01),
-        ret()
-    );
+        ret());
 
     core::emit(code);
 }
