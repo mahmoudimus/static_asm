@@ -1,0 +1,155 @@
+cmake_minimum_required(VERSION 3.19)
+project(static_asm
+    VERSION 1.0.0
+    DESCRIPTION "A C++20 compile-time x86 assembler library"
+    LANGUAGES CXX
+)
+
+# Set C++20 standard
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Export compile commands for IDE support
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Options
+option(STATIC_ASM_BUILD_TESTS "Build tests" ON)
+option(STATIC_ASM_BUILD_EXAMPLES "Build examples (requires Clang)" OFF)
+
+# Create header-only library interface
+add_library(static_asm INTERFACE)
+target_include_directories(static_asm INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
+# Detect if using clang-cl (Clang with MSVC frontend)
+set(USING_CLANG_CL FALSE)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+    set(USING_CLANG_CL TRUE)
+endif()
+
+# Compiler-specific flags
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT USING_CLANG_CL)
+    target_compile_options(static_asm INTERFACE
+        -Wall -Wextra
+    )
+    # Suppress warnings for clang pragmas when using GCC
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(static_asm INTERFACE
+            -Wno-unknown-pragmas
+        )
+    endif()
+    # MinGW specific
+    if(MINGW)
+        target_compile_options(static_asm INTERFACE
+            -Wa,-mbig-obj
+        )
+    endif()
+elseif(MSVC OR USING_CLANG_CL)
+    target_compile_options(static_asm INTERFACE
+        /W4 /permissive- /Zc:__cplusplus /bigobj
+        /Gy  # Enable function-level linking to handle duplicate COMDATs
+    )
+endif()
+
+# Tests
+if(STATIC_ASM_BUILD_TESTS)
+    enable_testing()
+
+    # Fetch GoogleTest
+    include(FetchContent)
+    FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG v1.14.0
+    )
+    # For Windows: Prevent overriding the parent project's compiler/linker settings
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+
+    # Test sources
+    set(TEST_SOURCES
+        tests/test_main.cpp
+        tests/test_alu.cpp
+        tests/test_bitscan.cpp
+        tests/test_bt.cpp
+        tests/test_call.cpp
+        tests/test_cmov.cpp
+        tests/test_jcc.cpp
+        tests/test_jcc_near.cpp
+        tests/test_jmp.cpp
+        tests/test_lea.cpp
+        tests/test_mov.cpp
+        tests/test_muldiv.cpp
+        tests/test_imul_multi.cpp
+        tests/test_nop.cpp
+        tests/test_pop.cpp
+        tests/test_push.cpp
+        tests/test_ret.cpp
+        tests/test_shellcode.cpp
+        tests/test_shift.cpp
+        tests/test_sib.cpp
+        tests/test_string.cpp
+        tests/test_test.cpp
+        tests/test_unary.cpp
+        tests/test_xchg.cpp
+        tests/test_generated.cpp
+        tests/test_movzx_movsx.cpp
+        tests/test_system.cpp
+    )
+
+    add_executable(static_asm_tests ${TEST_SOURCES})
+    target_link_libraries(static_asm_tests PRIVATE
+        static_asm
+        GTest::gtest_main
+    )
+
+    # Compiler-specific test flags
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT USING_CLANG_CL)
+        target_compile_options(static_asm_tests PRIVATE -O2)
+        if(MINGW)
+            target_compile_options(static_asm_tests PRIVATE -Wa,-mbig-obj)
+        endif()
+    elseif(MSVC OR USING_CLANG_CL)
+        # Only use /O2 in Release mode; Debug mode uses /RTC1 which conflicts with /O2
+        target_compile_options(static_asm_tests PRIVATE /bigobj)
+        target_compile_options(static_asm_tests PRIVATE $<$<CONFIG:Release>:/O2>)
+        # Enable inline expansion in Debug mode to avoid duplicate COMDAT errors
+        # from header-only template library (inline constexpr functions)
+        target_compile_options(static_asm_tests PRIVATE $<$<CONFIG:Debug>:/Ob1>)
+    endif()
+
+    include(GoogleTest)
+    gtest_discover_tests(static_asm_tests)
+endif()
+
+# Examples
+if(STATIC_ASM_BUILD_EXAMPLES)
+    add_executable(static_asm_example_basic examples/example_basic.cpp)
+    target_link_libraries(static_asm_example_basic PRIVATE static_asm)
+
+    add_executable(static_asm_example_basic_bis examples/example_basic_bis.cpp)
+    target_link_libraries(static_asm_example_basic_bis PRIVATE static_asm)
+
+    add_executable(static_asm_example_opaque_compute examples/example_opaque_compute.cpp)
+    target_link_libraries(static_asm_example_opaque_compute PRIVATE static_asm)
+
+    add_executable(static_asm_example_shellcode examples/example_shellcode.cpp)
+    target_link_libraries(static_asm_example_shellcode PRIVATE static_asm)
+
+    # Example-specific flags
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(static_asm_example_basic PRIVATE -O2)
+        target_compile_options(static_asm_example_basic_bis PRIVATE -O2)
+        target_compile_options(static_asm_example_opaque_compute PRIVATE -O2)
+        target_compile_options(static_asm_example_shellcode PRIVATE -O2)
+    elseif(MSVC)
+        target_compile_options(static_asm_example_basic PRIVATE /O2)
+        target_compile_options(static_asm_example_basic_bis PRIVATE /O2)
+        target_compile_options(static_asm_example_opaque_compute PRIVATE /O2)
+        target_compile_options(static_asm_example_shellcode PRIVATE /O2)
+    endif()
+endif()
