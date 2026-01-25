@@ -40,7 +40,8 @@ namespace static_asm::x86 {
     public:
         constexpr base_operand() = delete;
 
-        constexpr base_operand(e_operand_type type) : _type(type) {};
+        constexpr base_operand(e_operand_type type)
+            : _type(type) {};
 
         constexpr bool is_mem() const {
             return _type == e_operand_type::mem;
@@ -94,8 +95,9 @@ namespace static_asm::x86 {
     class register_operand : base_operand {
     public:
         constexpr register_operand() = delete;
-        constexpr register_operand(e_register_id id) : base_operand(e_operand_type::reg),
-                                                       _id(id) {}
+        constexpr register_operand(e_register_id id)
+            : base_operand(e_operand_type::reg),
+              _id(id) {}
 
         constexpr ~register_operand() = default;
 
@@ -146,8 +148,9 @@ namespace static_asm::x86 {
     class register8bit_operand : register_operand<8, false> {
     public:
         constexpr register8bit_operand() = delete;
-        constexpr register8bit_operand(e_register8bit_id id) : register_operand(e_register_id::unknown),
-                                                               _id(id) {}
+        constexpr register8bit_operand(e_register8bit_id id)
+            : register_operand(e_register_id::unknown),
+              _id(id) {}
 
         constexpr ~register8bit_operand() = default;
 
@@ -337,8 +340,9 @@ namespace static_asm::x86 {
     class immediate_operand : base_operand {
     public:
         constexpr immediate_operand() = delete;
-        constexpr immediate_operand(T value) : base_operand(e_operand_type::imm),
-                                               _value(value) {}
+        constexpr immediate_operand(T value)
+            : base_operand(e_operand_type::imm),
+              _value(value) {}
 
         constexpr ~immediate_operand() = default;
 
@@ -444,11 +448,12 @@ namespace static_asm::x86 {
     public:
         constexpr memory_operand() = delete;
 
-        constexpr memory_operand(e_addressing_type addressing_type, e_displacement_type displacement_type, e_mode mode, T value) : base_operand(e_operand_type::mem),
-                                                                                                                                   _addressing_type(addressing_type),
-                                                                                                                                   _displacement_type(displacement_type),
-                                                                                                                                   _mode(mode),
-                                                                                                                                   _value(value) {}
+        constexpr memory_operand(e_addressing_type addressing_type, e_displacement_type displacement_type, e_mode mode, T value)
+            : base_operand(e_operand_type::mem),
+              _addressing_type(addressing_type),
+              _displacement_type(displacement_type),
+              _mode(mode),
+              _value(value) {}
 
         constexpr ~memory_operand() = default;
 
@@ -611,7 +616,8 @@ namespace static_asm::x86 {
         Reg reg;
         static constexpr int scale = Scale;
 
-        constexpr scaled_reg(Reg r) : reg(r) {}
+        constexpr scaled_reg(Reg r)
+            : reg(r) {}
     };
 
     // Concept for scaled registers

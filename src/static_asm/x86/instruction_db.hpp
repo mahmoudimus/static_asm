@@ -199,13 +199,14 @@ namespace static_asm::x86 {
             std::uint8_t primary_opcode,
             std::uint8_t secondary_opcode,
             e_encoding encoding,
-            e_regopc_field regopc_field) : _id(id),
-                                           _prefix(prefix),
-                                           _prefix_0f(prefix_0f),
-                                           _primary_opcode(primary_opcode),
-                                           _secondary_opcode(secondary_opcode),
-                                           _encoding(encoding),
-                                           _regopc_field(regopc_field) {}
+            e_regopc_field regopc_field)
+            : _id(id),
+              _prefix(prefix),
+              _prefix_0f(prefix_0f),
+              _primary_opcode(primary_opcode),
+              _secondary_opcode(secondary_opcode),
+              _encoding(encoding),
+              _regopc_field(regopc_field) {}
 
         constexpr e_instruction_id id() const {
             return _id;
