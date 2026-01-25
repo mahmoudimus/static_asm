@@ -508,6 +508,8 @@ uv run scripts/gen_from_x86ref.py --generate-tests
 
 No automatic tool can reliably convert an arbitrary multi-file C++ library into a clean, header-only version without some manual preparation. The following techniques help ensure your library can be successfully amalgamated into a single header file while remaining correct, maintainable, and standards-compliant.
 
+> **Note:** This project uses [quom](https://github.com/Viatorus/quom) for amalgamation and [clang-tidy](https://clang.llvm.org/extra/clang-tidy/) with the `google-build-using-namespace` check to automate enforcement of these rules. quom also partially handles technique #4 (inline markers) through its processing capabilities.
+
 #### 1. Avoid `using namespace` in source files
 
 `using namespace` at file scope in `.cpp` files is dangerous when those files are later included in a header — it pollutes the global namespace for every translation unit that includes your header.
@@ -622,6 +624,8 @@ inline void MyLib::detail::Helper::do_work() {
 ```
 
 You can choose any macro name you prefer (e.g. `MYLIB_INLINE`, `INLINE_IMP`, etc.) and configure your amalgamation script accordingly.
+
+> **Note:** Tools like [quom](https://github.com/Viatorus/quom) can partially automate this by understanding C++ include semantics and properly handling function definitions during amalgamation, reducing the need for manual `inline` markers in many cases.
 
 #### Summary — The Four Key Rules
 
