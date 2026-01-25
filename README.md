@@ -504,29 +504,11 @@ uv run scripts/gen_from_x86ref.py --generate-tests
 2. Code the encoder in `encoder.hpp` or extend an existing encoder
 3. Add tests
 
-## Credits
-
-- [Godbolt](https://godbolt.org/) for prototyping
-- Intel x86-64 [manual](https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-instruction-set-reference-manual-325383.pdf)
-- [Defuse.ca](https://defuse.ca/online-x86-assembler.htm#disassembly) for verifying outputs
-- [Geek ABC reference](http://ref.x86asm.net/geek-abc.html)
-- [mazegen/x86reference](https://github.com/mazegen/x86reference) for the instruction database XML
-
-## Acknowledgments
-
-This project is based on [cx_assembler](https://github.com/Midi12/cx_assembler) by [Midi12](https://github.com/Midi12). The original library provided the foundation for compile-time x86 assembly encoding in C++.
-
-## Changelog
-
-See [changelog](CHANGELOG.md)
-
----
-
-# Techniques for Creating a Single-Header Library
+### Techniques for Creating a Single-Header Library
 
 No automatic tool can reliably convert an arbitrary multi-file C++ library into a clean, header-only version without some manual preparation. The following techniques help ensure your library can be successfully amalgamated into a single header file while remaining correct, maintainable, and standards-compliant.
 
-## 1. Avoid `using namespace` in source files
+#### 1. Avoid `using namespace` in source files
 
 `using namespace` at file scope in `.cpp` files is dangerous when those files are later included in a header — it pollutes the global namespace for every translation unit that includes your header.
 
@@ -550,7 +532,7 @@ MyLib::Foo::Foo() {
 }
 ```
 
-## 2. Place internal / private APIs in a nested namespace
+#### 2. Place internal / private APIs in a nested namespace
 
 Public APIs should live in the main namespace. Everything that is **not** intended for end-users should be hidden in a nested namespace such as `detail` or `impl`.
 
@@ -580,7 +562,7 @@ namespace MyLib::detail {
 }
 ```
 
-## 3. Convert file-scope static data to `static inline` class members
+#### 3. Convert file-scope static data to `static inline` class members
 
 File-scope `static` variables defined in `.cpp` files become problematic in a header-only world (multiple definitions, ODR violations).
 
@@ -612,7 +594,7 @@ inline int MyLib::next_id() {
 
 The `static inline` variable is guaranteed to have a single definition even when included multiple times.
 
-## 4. Mark functions defined outside class bodies as `inline`
+#### 4. Mark functions defined outside class bodies as `inline`
 
 Any function, member function, constructor, or destructor whose **body** appears in the header (but not inside the class definition) **must** be marked `inline` to avoid One Definition Rule (ODR) violations.
 
@@ -641,7 +623,7 @@ inline void MyLib::detail::Helper::do_work() {
 
 You can choose any macro name you prefer (e.g. `MYLIB_INLINE`, `INLINE_IMP`, etc.) and configure your amalgamation script accordingly.
 
-## Summary — The Four Key Rules
+#### Summary — The Four Key Rules
 
 1. **Never** write `using namespace …` at namespace/file scope in implementation files.
 2. Put all internal/non-public symbols into a nested namespace (`detail` / `impl`).
@@ -650,4 +632,14 @@ You can choose any macro name you prefer (e.g. `MYLIB_INLINE`, `INLINE_IMP`, etc
 
 Following these four practices makes the transition to a single-header distribution much smoother and far less error-prone — even when using purely text-based amalgamation tools.
 
-Happy header-only library writing!
+## Credits
+
+- [Godbolt](https://godbolt.org/) for prototyping
+- Intel x86-64 [manual](https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-instruction-set-reference-manual-325383.pdf)
+- [Defuse.ca](https://defuse.ca/online-x86-assembler.htm#disassembly) for verifying outputs
+- [Geek ABC reference](http://ref.x86asm.net/geek-abc.html)
+- [mazegen/x86reference](https://github.com/mazegen/x86reference) for the instruction database XML
+
+## Acknowledgments
+
+This project is based on [cx_assembler](https://github.com/Midi12/cx_assembler) by [Midi12](https://github.com/Midi12). The original library provided the foundation for compile-time x86 assembly encoding in C++.
