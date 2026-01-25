@@ -71,6 +71,21 @@ endif()
 if(STATIC_ASM_BUILD_TESTS)
     enable_testing()
 
+    # Format check (optional - runs if clang-format is found)
+    find_program(CLANG_FORMAT_EXE NAMES clang-format clang-format-19 clang-format-18)
+    if(CLANG_FORMAT_EXE)
+        file(GLOB_RECURSE ALL_SOURCE_FILES
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp
+        )
+        add_test(
+            NAME format-check
+            COMMAND ${CLANG_FORMAT_EXE} --dry-run --Werror ${ALL_SOURCE_FILES}
+        )
+        set_tests_properties(format-check PROPERTIES LABELS "lint")
+    endif()
+
     # Fetch GoogleTest
     include(FetchContent)
     FetchContent_Declare(

@@ -421,18 +421,18 @@ namespace static_asm::x86 {
     // Concept: Check if register is RBP or R13 (used for SIB encoding special cases)
     template<typename Reg>
     concept IsRBPOrR13 = Register<Reg> &&
-        requires {
-            { Reg::id_value } -> std::convertible_to<e_register_id>;
-        } &&
-        (Reg::id_value == e_register_id::bp || Reg::id_value == e_register_id::r13);
+                         requires {
+                             { Reg::id_value } -> std::convertible_to<e_register_id>;
+                         } &&
+                         (Reg::id_value == e_register_id::bp || Reg::id_value == e_register_id::r13);
 
     // Concept: Check if register is RSP or R12 (need SIB byte)
     template<typename Reg>
     concept IsRSPOrR12 = Register<Reg> &&
-        requires {
-            { Reg::id_value } -> std::convertible_to<e_register_id>;
-        } &&
-        (Reg::id_value == e_register_id::sp || Reg::id_value == e_register_id::r12);
+                         requires {
+                             { Reg::id_value } -> std::convertible_to<e_register_id>;
+                         } &&
+                         (Reg::id_value == e_register_id::sp || Reg::id_value == e_register_id::r12);
 
     namespace registers {
 
