@@ -29,7 +29,8 @@ AlignTrailingComments: false
 
 # Line breaks
 ColumnLimit: 0
-PackConstructorInitializers: CurrentLine
+# BinPack is the default and most consistent across clang-format 14+
+PackConstructorInitializers: BinPack
 AllowAllArgumentsOnNextLine: true
 AllowAllParametersOfDeclarationOnNextLine: true
 AllowShortBlocksOnASingleLine: false

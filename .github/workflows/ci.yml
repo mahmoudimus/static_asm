@@ -209,8 +209,7 @@ jobs:
 
     - name: Test
       working-directory: build
-      # Exclude format-check as LLVM 17 clang-format lacks PackConstructorInitializers
-      run: ctest -C ${{ matrix.build_type }} -E format-check --output-on-failure -j $env:NUMBER_OF_PROCESSORS
+      run: ctest -C ${{ matrix.build_type }} --output-on-failure -j $env:NUMBER_OF_PROCESSORS
 
   # MinGW builds on Windows
   windows-mingw:
