@@ -5,18 +5,18 @@
 #define STATIC_ASM_HPP
 
 // Core components
-#include "../src/static_asm/core/assembler.hpp"
-#include "../src/static_asm/core/emitter.hpp"
+#include "static_asm/core/assembler.hpp"
+#include "static_asm/core/emitter.hpp"
 
 // x86 architecture
-#include "../src/static_asm/x86/encoder.hpp"
-#include "../src/static_asm/x86/gen/instruction.g.hpp"
-#include "../src/static_asm/x86/gen/instruction_db.g.hpp"
-#include "../src/static_asm/x86/instruction_db.hpp"
-#include "../src/static_asm/x86/modrm.hpp"
-#include "../src/static_asm/x86/opcode_extension.hpp"
-#include "../src/static_asm/x86/operands.hpp"
-#include "../src/static_asm/x86/rex.hpp"
-#include "../src/static_asm/x86/sib.hpp"
+#include "static_asm/x86/encoder.hpp"
+#include "static_asm/x86/gen/instruction.g.hpp"
+#include "static_asm/x86/gen/instruction_db.g.hpp"
+#include "static_asm/x86/instruction_db.hpp"
+#include "static_asm/x86/modrm.hpp"
+#include "static_asm/x86/opcode_extension.hpp"
+#include "static_asm/x86/operands.hpp"
+#include "static_asm/x86/rex.hpp"
+#include "static_asm/x86/sib.hpp"
 
 #endif // STATIC_ASM_HPP

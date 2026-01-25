@@ -30,7 +30,6 @@ add_library(static_asm::static_asm ALIAS static_asm)
 
 target_include_directories(static_asm INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
 
@@ -75,9 +74,8 @@ if(STATIC_ASM_BUILD_TESTS)
     find_program(CLANG_FORMAT_EXE NAMES clang-format clang-format-19 clang-format-18)
     if(CLANG_FORMAT_EXE)
         file(GLOB_RECURSE ALL_SOURCE_FILES
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/include/*.cpp
         )
         add_test(
             NAME format-check
@@ -188,7 +186,6 @@ if(STATIC_ASM_MAIN_PROJECT)
 
     # Install headers
     install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-    install(DIRECTORY src/static_asm/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/static_asm)
 
     # Install target
     install(TARGETS static_asm

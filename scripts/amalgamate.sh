@@ -37,7 +37,6 @@ HEADER="// static_asm - Compile-time x86/x86-64 assembler for C++20
 TEMP_FILE=$(mktemp)
 quom "$ROOT_DIR/include/static_asm.hpp" "$TEMP_FILE" \
     -I "$ROOT_DIR/include" \
-    -I "$ROOT_DIR/src" \
     --trim
 
 # Combine header and amalgamated content

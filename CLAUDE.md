@@ -28,10 +28,10 @@ This is a **header-only C++20 library** for compile-time x86 assembly encoding. 
 ### Key Components
 
 - **`include/static_asm.hpp`** - Main include file (amalgamated header)
-- **`src/static_asm/core/assembler.hpp`** - `assemble()` function to concatenate instruction byte arrays
-- **`src/static_asm/core/emitter.hpp`** - `emit()` for Clang inline assembly (Clang-only, requires -O2)
+- **`include/static_asm/core/assembler.hpp`** - `assemble()` function to concatenate instruction byte arrays
+- **`include/static_asm/core/emitter.hpp`** - `emit()` for Clang inline assembly (Clang-only, requires -O2)
 
-### x86 Encoding Layer (`src/static_asm/x86/`)
+### x86 Encoding Layer (`include/static_asm/x86/`)
 
 - **`operands.hpp`** - Register, immediate, and memory operand types with C++20 concepts
 - **`encoder.hpp`** - Instruction encoding functions (`encode_alu`, `encode_mov`, `encode_jmp`, etc.)

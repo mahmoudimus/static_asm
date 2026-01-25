@@ -7,7 +7,7 @@ on:
     branches: [ main, master, develop ]
 
 jobs:
-  # Check code formatting with clang-format
+  # Check code formatting with clang-format (via CTest)
   format:
     runs-on: ubuntu-latest
     name: Format (clang-format)
@@ -22,9 +22,11 @@ jobs:
         sudo ./llvm.sh 19
         sudo apt-get install -y clang-format-19
 
-    - name: Check formatting
-      run: |
-        find src include -name '*.hpp' -o -name '*.cpp' | xargs clang-format-19 --dry-run --Werror
+    - name: Configure CMake
+      run: cmake -B build -DSTATIC_ASM_BUILD_TESTS=ON
+
+    - name: Run format check
+      run: ctest --test-dir build -R format-check --output-on-failure
 
   # Static analysis with clang-tidy
   tidy:
@@ -54,11 +56,11 @@ jobs:
     - name: Run clang-tidy
       run: |
         # Run clang-tidy on test files (which include the headers)
-        # Filter to only report issues in src/ and include/ directories
+        # Filter to only report issues in include/ directory
         clang-tidy-19 -p build \
           --checks='-*,google-build-using-namespace,bugprone-*,modernize-use-override' \
-          --header-filter='.*/(src|include)/.*\.hpp$' \
-          tests/test_main.cpp 2>&1 | grep -E '^(src|include)/' || true
+          --header-filter='.*/include/.*\.hpp$' \
+          tests/test_main.cpp 2>&1 | grep -E '^include/' || true
 
   # Linux builds with GCC and Clang
   linux:
