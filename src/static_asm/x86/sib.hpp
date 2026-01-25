@@ -18,19 +18,20 @@ namespace static_asm::x86 {
 
     // SIB byte format: [Scale:2][Index:3][Base:3]
     // Encode SIB byte for general SIB addressing
+    // Now uses compile-time register IDs via Reg::id()
     template<typename Base, typename Index, int Scale>
         requires(Register<Base> || std::same_as<Base, no_base_t>) && (Register<Index> || std::same_as<Index, no_index_t>)
-    inline constexpr std::uint8_t encode_sib(const Base& base, const Index& index) {
+    inline constexpr std::uint8_t encode_sib([[maybe_unused]] const Base& base, [[maybe_unused]] const Index& index) {
         std::uint8_t scale_bits = encode_scale(Scale);
         std::uint8_t index_bits = 0b100; // Default: no index (RSP encoding)
         std::uint8_t base_bits = 0b101; // Default: no base (disp32 only)
 
         if constexpr (Register<Index>) {
-            index_bits = static_cast<std::uint8_t>(index.id()) & 0b111;
+            index_bits = static_cast<std::uint8_t>(Index::id()) & 0b111;
         }
 
         if constexpr (Register<Base>) {
-            base_bits = static_cast<std::uint8_t>(base.id()) & 0b111;
+            base_bits = static_cast<std::uint8_t>(Base::id()) & 0b111;
         }
 
         return (scale_bits << 6) | (index_bits << 3) | base_bits;

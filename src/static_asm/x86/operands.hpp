@@ -103,19 +103,24 @@ namespace static_asm::x86 {
         unknown
     };
 
-    template<std::size_t Size, bool Extended>
+    // =========================================================================
+    // Register Operand - ID is now a template parameter for full compile-time
+    // =========================================================================
+    template<e_register_id ID, std::size_t Size, bool Extended>
     class register_operand : base_operand {
     public:
-        constexpr register_operand() = delete;
-        constexpr register_operand(e_register_id id)
-            : base_operand(e_operand_type::reg),
-              _id(id) {}
+        constexpr register_operand()
+            : base_operand(e_operand_type::reg) {}
 
         constexpr ~register_operand() = default;
 
-        constexpr e_register_id id() const {
-            return _id;
+        // Static id accessor - returns the compile-time ID
+        static constexpr e_register_id id() {
+            return ID;
         }
+
+        // Also provide as a static member for template metaprogramming
+        static constexpr e_register_id id_value = ID;
 
         constexpr bool is8() const {
             return Size == 8;
@@ -130,20 +135,14 @@ namespace static_asm::x86 {
             return Size == 64;
         };
 
-        // constexpr bool is_extended_register() const { return Extended; }
-        // constexpr std::size_t register_size() const { return Size; }
-
         static constexpr bool extended = Extended;
         static constexpr std::size_t size = Size;
 
-        constexpr bool is_ip() const {
-            return _id == e_register_id::ip;
+        static constexpr bool is_ip() {
+            return ID == e_register_id::ip;
         }
 
-        using value_type = register_operand<Size, Extended>;
-
-    private:
-        e_register_id _id;
+        using value_type = register_operand<ID, Size, Extended>;
     };
 
     enum class e_register8bit_id {
@@ -157,44 +156,173 @@ namespace static_asm::x86 {
         bh
     };
 
-    class register8bit_operand : register_operand<8, false> {
+    // Special 8-bit register operand for legacy al/ah/bl/bh/etc registers
+    // These have their own ID space (e_register8bit_id)
+    template<e_register8bit_id ID>
+    class register8bit_operand : public register_operand<e_register_id::unknown, 8, false> {
     public:
-        constexpr register8bit_operand() = delete;
-        constexpr register8bit_operand(e_register8bit_id id)
-            : register_operand(e_register_id::unknown),
-              _id(id) {}
+        constexpr register8bit_operand()
+            : register_operand<e_register_id::unknown, 8, false>() {}
 
         constexpr ~register8bit_operand() = default;
 
-        constexpr e_register8bit_id id() const {
-            return _id;
+        // Return the 8-bit specific ID
+        static constexpr e_register8bit_id id() {
+            return ID;
         }
+
+        static constexpr e_register8bit_id id_value = ID;
 
         // override extended static member
         static constexpr bool extended = false;
         // override size static member
         static constexpr std::size_t size = 8;
 
-        using value_type = register_operand<8, false>;
-
-    private:
-        e_register8bit_id _id;
+        using value_type = register8bit_operand<ID>;
     };
 
-    template<std::size_t Size, bool Extended>
-    using reg = register_operand<Size, Extended>;
+    // =========================================================================
+    // Type aliases for register operands (generic forms)
+    // =========================================================================
+    template<e_register_id ID, std::size_t Size, bool Extended>
+    using reg = register_operand<ID, Size, Extended>;
 
-    using reg8 = reg<8, false>;
-    using reg16 = reg<16, false>;
-    using reg32 = reg<32, false>;
-    using reg64 = reg<64, false>;
+    // Generic register type aliases (for backward compatibility in templates)
+    // These are now parameterized by ID
+    template<e_register_id ID>
+    using reg8 = reg<ID, 8, false>;
 
-    using ereg8 = reg<8, true>;
-    using ereg16 = reg<16, true>;
-    using ereg32 = reg<32, true>;
-    using ereg64 = reg<64, true>;
+    template<e_register_id ID>
+    using reg16 = reg<ID, 16, false>;
 
-    using reg8lh = register8bit_operand;
+    template<e_register_id ID>
+    using reg32 = reg<ID, 32, false>;
+
+    template<e_register_id ID>
+    using reg64 = reg<ID, 64, false>;
+
+    template<e_register_id ID>
+    using ereg8 = reg<ID, 8, true>;
+
+    template<e_register_id ID>
+    using ereg16 = reg<ID, 16, true>;
+
+    template<e_register_id ID>
+    using ereg32 = reg<ID, 32, true>;
+
+    template<e_register_id ID>
+    using ereg64 = reg<ID, 64, true>;
+
+    template<e_register8bit_id ID>
+    using reg8lh = register8bit_operand<ID>;
+
+    // =========================================================================
+    // Concrete register type aliases for each physical register
+    // =========================================================================
+
+    // RAX family
+    using rax_t = reg<e_register_id::ax, 64, false>;
+    using eax_t = reg<e_register_id::ax, 32, false>;
+    using ax_t = reg<e_register_id::ax, 16, false>;
+    using al_t = register8bit_operand<e_register8bit_id::al>;
+    using ah_t = register8bit_operand<e_register8bit_id::ah>;
+
+    // RBX family
+    using rbx_t = reg<e_register_id::bx, 64, false>;
+    using ebx_t = reg<e_register_id::bx, 32, false>;
+    using bx_t = reg<e_register_id::bx, 16, false>;
+    using bl_t = register8bit_operand<e_register8bit_id::bl>;
+    using bh_t = register8bit_operand<e_register8bit_id::bh>;
+
+    // RCX family
+    using rcx_t = reg<e_register_id::cx, 64, false>;
+    using ecx_t = reg<e_register_id::cx, 32, false>;
+    using cx_t = reg<e_register_id::cx, 16, false>;
+    using cl_t = register8bit_operand<e_register8bit_id::cl>;
+    using ch_t = register8bit_operand<e_register8bit_id::ch>;
+
+    // RDX family
+    using rdx_t = reg<e_register_id::dx, 64, false>;
+    using edx_t = reg<e_register_id::dx, 32, false>;
+    using dx_t = reg<e_register_id::dx, 16, false>;
+    using dl_t = register8bit_operand<e_register8bit_id::dl>;
+    using dh_t = register8bit_operand<e_register8bit_id::dh>;
+
+    // RSI family
+    using rsi_t = reg<e_register_id::si, 64, false>;
+    using esi_t = reg<e_register_id::si, 32, false>;
+    using si_t = reg<e_register_id::si, 16, false>;
+    using sil_t = reg<e_register_id::si, 8, true>;
+
+    // RDI family
+    using rdi_t = reg<e_register_id::di, 64, false>;
+    using edi_t = reg<e_register_id::di, 32, false>;
+    using di_t = reg<e_register_id::di, 16, false>;
+    using dil_t = reg<e_register_id::di, 8, true>;
+
+    // RBP family
+    using rbp_t = reg<e_register_id::bp, 64, false>;
+    using ebp_t = reg<e_register_id::bp, 32, false>;
+    using bp_t = reg<e_register_id::bp, 16, false>;
+    using bpl_t = reg<e_register_id::bp, 8, true>;
+
+    // RSP family
+    using rsp_t = reg<e_register_id::sp, 64, false>;
+    using esp_t = reg<e_register_id::sp, 32, false>;
+    using sp_t = reg<e_register_id::sp, 16, false>;
+    using spl_t = reg<e_register_id::sp, 8, true>;
+
+    // R8 family
+    using r8_t = reg<e_register_id::r8, 64, true>;
+    using r8d_t = reg<e_register_id::r8, 32, true>;
+    using r8w_t = reg<e_register_id::r8, 16, true>;
+    using r8b_t = reg<e_register_id::r8, 8, true>;
+
+    // R9 family
+    using r9_t = reg<e_register_id::r9, 64, true>;
+    using r9d_t = reg<e_register_id::r9, 32, true>;
+    using r9w_t = reg<e_register_id::r9, 16, true>;
+    using r9b_t = reg<e_register_id::r9, 8, true>;
+
+    // R10 family
+    using r10_t = reg<e_register_id::r10, 64, true>;
+    using r10d_t = reg<e_register_id::r10, 32, true>;
+    using r10w_t = reg<e_register_id::r10, 16, true>;
+    using r10b_t = reg<e_register_id::r10, 8, true>;
+
+    // R11 family
+    using r11_t = reg<e_register_id::r11, 64, true>;
+    using r11d_t = reg<e_register_id::r11, 32, true>;
+    using r11w_t = reg<e_register_id::r11, 16, true>;
+    using r11b_t = reg<e_register_id::r11, 8, true>;
+
+    // R12 family
+    using r12_t = reg<e_register_id::r12, 64, true>;
+    using r12d_t = reg<e_register_id::r12, 32, true>;
+    using r12w_t = reg<e_register_id::r12, 16, true>;
+    using r12b_t = reg<e_register_id::r12, 8, true>;
+
+    // R13 family
+    using r13_t = reg<e_register_id::r13, 64, true>;
+    using r13d_t = reg<e_register_id::r13, 32, true>;
+    using r13w_t = reg<e_register_id::r13, 16, true>;
+    using r13b_t = reg<e_register_id::r13, 8, true>;
+
+    // R14 family
+    using r14_t = reg<e_register_id::r14, 64, true>;
+    using r14d_t = reg<e_register_id::r14, 32, true>;
+    using r14w_t = reg<e_register_id::r14, 16, true>;
+    using r14b_t = reg<e_register_id::r14, 8, true>;
+
+    // R15 family
+    using r15_t = reg<e_register_id::r15, 64, true>;
+    using r15d_t = reg<e_register_id::r15, 32, true>;
+    using r15w_t = reg<e_register_id::r15, 16, true>;
+    using r15b_t = reg<e_register_id::r15, 8, true>;
+
+    // RIP/EIP
+    using rip_t = reg<e_register_id::ip, 64, false>;
+    using eip_t = reg<e_register_id::ip, 32, false>;
 
     // =========================================================================
     // Register Concepts - Unified hierarchy for x86 register operands
@@ -211,12 +339,25 @@ namespace static_asm::x86 {
     //                      ERegister8, ERegister16, etc.
 
     // Internal concept - matches exact register_operand type
-    template<typename T, std::size_t Size, bool Extended>
-    concept _Register = std::same_as<reg<Size, Extended>, T>;
+    // Updated to work with the new template structure
+    template<typename T>
+    concept _RegisterOperand = requires {
+        { T::id_value } -> std::convertible_to<e_register_id>;
+        { T::extended } -> std::convertible_to<bool>;
+        { T::size } -> std::convertible_to<std::size_t>;
+    };
+
+    // Check if type is a register8bit_operand (al/ah/bl/bh/etc)
+    template<typename T>
+    concept _Register8bitOperand = requires {
+        { T::id_value } -> std::convertible_to<e_register8bit_id>;
+        { T::extended } -> std::convertible_to<bool>;
+        { T::size } -> std::convertible_to<std::size_t>;
+    } && (T::size == 8) && (!T::extended);
 
     // Base concept: any register operand (including special 8-bit al/ah/etc)
     template<typename T>
-    concept Register = _Register<T, T::size, T::extended> || std::same_as<register8bit_operand, T>;
+    concept Register = _RegisterOperand<T> || _Register8bitOperand<T>;
 
     // Parameterized concept: register of specific size (8, 16, 32, or 64 bits)
     template<typename T, std::size_t Size>
@@ -224,11 +365,11 @@ namespace static_asm::x86 {
 
     // Extended registers (r8-r15 and their sub-registers) - require REX.B prefix
     template<typename T, std::size_t Size>
-    concept ExtendedRegister = _Register<T, Size, true>;
+    concept ExtendedRegister = Register<T> && (T::size == Size) && T::extended;
 
     // Legacy registers (rax-rdi and their sub-registers) - no REX.B needed
     template<typename T, std::size_t Size>
-    concept LegacyRegister = _Register<T, Size, false>;
+    concept LegacyRegister = Register<T> && (T::size == Size) && !T::extended;
 
     // Size-specific legacy register concepts
     template<typename T>
@@ -241,7 +382,7 @@ namespace static_asm::x86 {
     concept LRegister16 = LegacyRegister<T, 16>;
 
     template<typename T>
-    concept LRegister8 = std::same_as<register8bit_operand, T>;
+    concept LRegister8 = _Register8bitOperand<T>;
 
     // Size-specific extended register concepts
     template<typename T>
@@ -270,98 +411,117 @@ namespace static_asm::x86 {
     concept Register8 = RegisterOfSize<T, 8>;
 
     // Concept to check if a register is the CL register (used for shift/rotate by CL)
-    // Note: At compile time we can only check the type, not the actual register ID
     template<typename T>
     concept IsCLRegister = LRegister8<T>;
 
+    // =========================================================================
+    // Compile-time register ID checks (concepts)
+    // =========================================================================
+
+    // Concept: Check if register is RBP or R13 (used for SIB encoding special cases)
+    template<typename Reg>
+    concept IsRBPOrR13 = Register<Reg> &&
+        requires {
+            { Reg::id_value } -> std::convertible_to<e_register_id>;
+        } &&
+        (Reg::id_value == e_register_id::bp || Reg::id_value == e_register_id::r13);
+
+    // Concept: Check if register is RSP or R12 (need SIB byte)
+    template<typename Reg>
+    concept IsRSPOrR12 = Register<Reg> &&
+        requires {
+            { Reg::id_value } -> std::convertible_to<e_register_id>;
+        } &&
+        (Reg::id_value == e_register_id::sp || Reg::id_value == e_register_id::r12);
+
     namespace registers {
 
-        constexpr reg64 rax(e_register_id::ax);
-        constexpr reg32 eax(e_register_id::ax);
-        constexpr reg16 ax(e_register_id::ax);
-        constexpr reg8lh al(e_register8bit_id::al);
-        constexpr reg8lh ah(e_register8bit_id::ah);
+        inline constexpr rax_t rax{};
+        inline constexpr eax_t eax{};
+        inline constexpr ax_t ax{};
+        inline constexpr al_t al{};
+        inline constexpr ah_t ah{};
 
-        constexpr reg64 rbx(e_register_id::bx);
-        constexpr reg32 ebx(e_register_id::bx);
-        constexpr reg16 bx(e_register_id::bx);
-        constexpr reg8lh bl(e_register8bit_id::bl);
-        constexpr reg8lh bh(e_register8bit_id::bh);
+        inline constexpr rbx_t rbx{};
+        inline constexpr ebx_t ebx{};
+        inline constexpr bx_t bx{};
+        inline constexpr bl_t bl{};
+        inline constexpr bh_t bh{};
 
-        constexpr reg64 rcx(e_register_id::cx);
-        constexpr reg32 ecx(e_register_id::cx);
-        constexpr reg16 cx(e_register_id::cx);
-        constexpr reg8lh cl(e_register8bit_id::cl);
-        constexpr reg8lh ch(e_register8bit_id::ch);
+        inline constexpr rcx_t rcx{};
+        inline constexpr ecx_t ecx{};
+        inline constexpr cx_t cx{};
+        inline constexpr cl_t cl{};
+        inline constexpr ch_t ch{};
 
-        constexpr reg64 rdx(e_register_id::dx);
-        constexpr reg32 edx(e_register_id::dx);
-        constexpr reg16 dx(e_register_id::dx);
-        constexpr reg8lh dl(e_register8bit_id::dl);
-        constexpr reg8lh dh(e_register8bit_id::dh);
+        inline constexpr rdx_t rdx{};
+        inline constexpr edx_t edx{};
+        inline constexpr dx_t dx{};
+        inline constexpr dl_t dl{};
+        inline constexpr dh_t dh{};
 
-        constexpr reg64 rsi(e_register_id::si);
-        constexpr reg32 esi(e_register_id::si);
-        constexpr reg16 si(e_register_id::si);
-        constexpr ereg8 sil(e_register_id::si);
+        inline constexpr rsi_t rsi{};
+        inline constexpr esi_t esi{};
+        inline constexpr si_t si{};
+        inline constexpr sil_t sil{};
 
-        constexpr reg64 rdi(e_register_id::di);
-        constexpr reg32 edi(e_register_id::di);
-        constexpr reg16 di(e_register_id::di);
-        constexpr ereg8 dil(e_register_id::di);
+        inline constexpr rdi_t rdi{};
+        inline constexpr edi_t edi{};
+        inline constexpr di_t di{};
+        inline constexpr dil_t dil{};
 
-        constexpr reg64 rbp(e_register_id::bp);
-        constexpr reg32 ebp(e_register_id::bp);
-        constexpr reg16 bp(e_register_id::bp);
-        constexpr ereg8 bpl(e_register_id::bp);
+        inline constexpr rbp_t rbp{};
+        inline constexpr ebp_t ebp{};
+        inline constexpr bp_t bp{};
+        inline constexpr bpl_t bpl{};
 
-        constexpr reg64 rsp(e_register_id::sp);
-        constexpr reg32 esp(e_register_id::sp);
-        constexpr reg16 sp(e_register_id::sp);
-        constexpr ereg8 spl(e_register_id::sp);
+        inline constexpr rsp_t rsp{};
+        inline constexpr esp_t esp{};
+        inline constexpr sp_t sp{};
+        inline constexpr spl_t spl{};
 
-        constexpr ereg64 r8(e_register_id::r8);
-        constexpr ereg32 r8d(e_register_id::r8);
-        constexpr ereg16 r8w(e_register_id::r8);
-        constexpr ereg8 r8b(e_register_id::r8);
+        inline constexpr r8_t r8{};
+        inline constexpr r8d_t r8d{};
+        inline constexpr r8w_t r8w{};
+        inline constexpr r8b_t r8b{};
 
-        constexpr ereg64 r9(e_register_id::r9);
-        constexpr ereg32 r9d(e_register_id::r9);
-        constexpr ereg16 r9w(e_register_id::r9);
-        constexpr ereg8 r9b(e_register_id::r9);
+        inline constexpr r9_t r9{};
+        inline constexpr r9d_t r9d{};
+        inline constexpr r9w_t r9w{};
+        inline constexpr r9b_t r9b{};
 
-        constexpr ereg64 r10(e_register_id::r10);
-        constexpr ereg32 r10d(e_register_id::r10);
-        constexpr ereg16 r10w(e_register_id::r10);
-        constexpr ereg8 r10b(e_register_id::r10);
+        inline constexpr r10_t r10{};
+        inline constexpr r10d_t r10d{};
+        inline constexpr r10w_t r10w{};
+        inline constexpr r10b_t r10b{};
 
-        constexpr ereg64 r11(e_register_id::r11);
-        constexpr ereg32 r11d(e_register_id::r11);
-        constexpr ereg16 r11w(e_register_id::r11);
-        constexpr ereg8 r11b(e_register_id::r11);
+        inline constexpr r11_t r11{};
+        inline constexpr r11d_t r11d{};
+        inline constexpr r11w_t r11w{};
+        inline constexpr r11b_t r11b{};
 
-        constexpr ereg64 r12(e_register_id::r12);
-        constexpr ereg32 r12d(e_register_id::r12);
-        constexpr ereg16 r12w(e_register_id::r12);
-        constexpr ereg8 r12b(e_register_id::r12);
+        inline constexpr r12_t r12{};
+        inline constexpr r12d_t r12d{};
+        inline constexpr r12w_t r12w{};
+        inline constexpr r12b_t r12b{};
 
-        constexpr ereg64 r13(e_register_id::r13);
-        constexpr ereg32 r13d(e_register_id::r13);
-        constexpr ereg16 r13w(e_register_id::r13);
-        constexpr ereg8 r13b(e_register_id::r13);
+        inline constexpr r13_t r13{};
+        inline constexpr r13d_t r13d{};
+        inline constexpr r13w_t r13w{};
+        inline constexpr r13b_t r13b{};
 
-        constexpr ereg64 r14(e_register_id::r14);
-        constexpr ereg32 r14d(e_register_id::r14);
-        constexpr ereg16 r14w(e_register_id::r14);
-        constexpr ereg8 r14b(e_register_id::r14);
+        inline constexpr r14_t r14{};
+        inline constexpr r14d_t r14d{};
+        inline constexpr r14w_t r14w{};
+        inline constexpr r14b_t r14b{};
 
-        constexpr ereg64 r15(e_register_id::r15);
-        constexpr ereg32 r15d(e_register_id::r15);
-        constexpr ereg16 r15w(e_register_id::r15);
-        constexpr ereg8 r15b(e_register_id::r15);
+        inline constexpr r15_t r15{};
+        inline constexpr r15d_t r15d{};
+        inline constexpr r15w_t r15w{};
+        inline constexpr r15b_t r15b{};
 
-        constexpr reg64 rip(e_register_id::ip);
-        constexpr reg32 eip(e_register_id::ip);
+        inline constexpr rip_t rip{};
+        inline constexpr eip_t eip{};
     } // namespace registers
 
     // Use standard library concepts for integer types
@@ -417,51 +577,55 @@ namespace static_asm::x86 {
     template<typename T>
     concept Immediate64 = _Immediate<T, std::uint64_t>;
 
+    // =========================================================================
+    // truncate_as - Type trait for truncating immediates to register size
+    // =========================================================================
     template<typename T>
     struct truncate_as {};
 
-    template<>
-    struct truncate_as<reg8> {
+    // Specializations for all register types
+    template<e_register_id ID>
+    struct truncate_as<reg<ID, 8, false>> {
         using type = std::uint8_t;
     };
 
-    template<>
-    struct truncate_as<reg16> {
+    template<e_register_id ID>
+    struct truncate_as<reg<ID, 16, false>> {
         using type = std::uint16_t;
     };
 
-    template<>
-    struct truncate_as<reg32> {
+    template<e_register_id ID>
+    struct truncate_as<reg<ID, 32, false>> {
         using type = std::uint32_t;
     };
 
-    template<>
-    struct truncate_as<reg64> {
+    template<e_register_id ID>
+    struct truncate_as<reg<ID, 64, false>> {
         using type = std::uint32_t;
     };
 
-    template<>
-    struct truncate_as<ereg8> {
+    template<e_register_id ID>
+    struct truncate_as<reg<ID, 8, true>> {
         using type = std::uint8_t;
     };
 
-    template<>
-    struct truncate_as<ereg16> {
+    template<e_register_id ID>
+    struct truncate_as<reg<ID, 16, true>> {
         using type = std::uint16_t;
     };
 
-    template<>
-    struct truncate_as<ereg32> {
+    template<e_register_id ID>
+    struct truncate_as<reg<ID, 32, true>> {
         using type = std::uint32_t;
     };
 
-    template<>
-    struct truncate_as<ereg64> {
+    template<e_register_id ID>
+    struct truncate_as<reg<ID, 64, true>> {
         using type = std::uint32_t;
     };
 
-    template<>
-    struct truncate_as<reg8lh> {
+    template<e_register8bit_id ID>
+    struct truncate_as<register8bit_operand<ID>> {
         using type = std::uint8_t;
     };
 
@@ -535,11 +699,6 @@ namespace static_asm::x86 {
 
     template<typename T>
     concept Memory = _Memory<T, typename T::value_type>;
-
-    // template <typename M>
-    // struct truncate_as<memory_operand<M>> {
-    //     using type = typename truncate_as<typename memory_operand<M>::value_type>::type;
-    // };
 
     template<typename T>
         requires Immediate<T>
@@ -673,12 +832,14 @@ namespace static_asm::x86 {
         static constexpr e_register_id id() {
             return e_register_id::unknown;
         }
+        static constexpr e_register_id id_value = e_register_id::unknown;
     };
     struct no_index_t {
         static constexpr bool extended = false;
         static constexpr e_register_id id() {
             return e_register_id::unknown;
         }
+        static constexpr e_register_id id_value = e_register_id::unknown;
     };
     inline constexpr no_base_t no_base{};
     inline constexpr no_index_t no_index{};
