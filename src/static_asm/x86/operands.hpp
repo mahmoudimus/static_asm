@@ -6,6 +6,18 @@
 
 namespace static_asm::x86 {
 
+    // =========================================================================
+    // Compile-time validation helpers
+    // =========================================================================
+
+    // Valid x86 operand sizes in bits
+    template<std::size_t Size>
+    concept ValidOperandSize = (Size == 8 || Size == 16 || Size == 32 || Size == 64);
+
+    // Valid x86 SIB scale factors
+    template<int Scale>
+    concept ValidScale = (Scale == 1 || Scale == 2 || Scale == 4 || Scale == 8);
+
     struct void_operand {
         static constexpr bool extended = false;
         static constexpr std::size_t size = 0;
@@ -184,18 +196,41 @@ namespace static_asm::x86 {
 
     using reg8lh = register8bit_operand;
 
+    // =========================================================================
+    // Register Concepts - Unified hierarchy for x86 register operands
+    // =========================================================================
+    //
+    // Hierarchy:
+    //   Register (base) - any register operand
+    //     RegisterOfSize<N> - register of specific bit width (8, 16, 32, 64)
+    //       ExtendedRegister<N> - r8-r15 variants (require REX prefix)
+    //       LegacyRegister<N> - original x86/x86-64 registers
+    //
+    // Convenience aliases: Register8, Register16, Register32, Register64
+    //                      LRegister8, LRegister16, etc.
+    //                      ERegister8, ERegister16, etc.
+
+    // Internal concept - matches exact register_operand type
     template<typename T, std::size_t Size, bool Extended>
     concept _Register = std::same_as<reg<Size, Extended>, T>;
 
+    // Base concept: any register operand (including special 8-bit al/ah/etc)
     template<typename T>
     concept Register = _Register<T, T::size, T::extended> || std::same_as<register8bit_operand, T>;
 
+    // Parameterized concept: register of specific size (8, 16, 32, or 64 bits)
+    template<typename T, std::size_t Size>
+    concept RegisterOfSize = Register<T> && (T::size == Size);
+
+    // Extended registers (r8-r15 and their sub-registers) - require REX.B prefix
     template<typename T, std::size_t Size>
     concept ExtendedRegister = _Register<T, Size, true>;
 
+    // Legacy registers (rax-rdi and their sub-registers) - no REX.B needed
     template<typename T, std::size_t Size>
     concept LegacyRegister = _Register<T, Size, false>;
 
+    // Size-specific legacy register concepts
     template<typename T>
     concept LRegister64 = LegacyRegister<T, 64>;
 
@@ -208,6 +243,7 @@ namespace static_asm::x86 {
     template<typename T>
     concept LRegister8 = std::same_as<register8bit_operand, T>;
 
+    // Size-specific extended register concepts
     template<typename T>
     concept ERegister64 = ExtendedRegister<T, 64>;
 
@@ -220,19 +256,21 @@ namespace static_asm::x86 {
     template<typename T>
     concept ERegister8 = ExtendedRegister<T, 8>;
 
+    // Size-specific register concepts (any extended or legacy)
     template<typename T>
-    concept Register64 = ERegister64<T> || LRegister64<T>;
+    concept Register64 = RegisterOfSize<T, 64>;
 
     template<typename T>
-    concept Register32 = ERegister32<T> || LRegister32<T>;
+    concept Register32 = RegisterOfSize<T, 32>;
 
     template<typename T>
-    concept Register16 = ERegister16<T> || LRegister16<T>;
+    concept Register16 = RegisterOfSize<T, 16>;
 
     template<typename T>
-    concept Register8 = ERegister8<T> || LRegister8<T>;
+    concept Register8 = RegisterOfSize<T, 8>;
 
     // Concept to check if a register is the CL register (used for shift/rotate by CL)
+    // Note: At compile time we can only check the type, not the actual register ID
     template<typename T>
     concept IsCLRegister = LRegister8<T>;
 
@@ -326,14 +364,16 @@ namespace static_asm::x86 {
         constexpr reg32 eip(e_register_id::ip);
     } // namespace registers
 
+    // Use standard library concepts for integer types
+    // These provide proper type trait integration and are more maintainable
     template<typename T>
-    concept SignedInteger = std::same_as<T, std::int8_t> || std::same_as<T, std::int16_t> || std::same_as<T, std::int32_t> || std::same_as<T, std::int64_t> || std::same_as<T, signed char> || std::same_as<T, short> || std::same_as<T, int> || std::same_as<T, long> || std::same_as<T, long long>;
+    concept SignedInteger = std::signed_integral<T>;
 
     template<typename T>
-    concept UnsignedInteger = std::same_as<T, std::uint8_t> || std::same_as<T, std::uint16_t> || std::same_as<T, std::uint32_t> || std::same_as<T, std::uint64_t> || std::same_as<T, unsigned char> || std::same_as<T, unsigned short> || std::same_as<T, unsigned int> || std::same_as<T, unsigned long> || std::same_as<T, unsigned long long>;
+    concept UnsignedInteger = std::unsigned_integral<T>;
 
     template<typename T>
-    concept Integer = UnsignedInteger<T> || SignedInteger<T>;
+    concept Integer = std::integral<T> && !std::same_as<T, bool>;
 
     template<typename T>
         requires Integer<T>
@@ -611,7 +651,7 @@ namespace static_asm::x86 {
 
     // Represents a register multiplied by a scale factor: rbx * 4
     template<typename Reg, int Scale>
-        requires Register<Reg> && (Scale == 1 || Scale == 2 || Scale == 4 || Scale == 8)
+        requires Register<Reg> && ValidScale<Scale>
     struct scaled_reg {
         Reg reg;
         static constexpr int scale = Scale;
@@ -620,14 +660,12 @@ namespace static_asm::x86 {
             : reg(r) {}
     };
 
-    // Concept for scaled registers
+    // Concept for scaled registers - checks for scaled_reg template structure
     template<typename T>
-    concept ScaledRegister = requires {
-        typename std::remove_cvref_t<T>;
-    } && requires(T t) {
-        { t.reg };
-        { T::scale } -> std::convertible_to<int>;
-    };
+    concept ScaledRegister = requires(T t) {
+        { t.reg } -> Register; // Must have a register member that satisfies Register
+        { T::scale } -> std::convertible_to<int>; // Must have a scale constant
+    } && ValidScale<T::scale>; // Valid x86 scales only
 
     // Sentinel types for "no base" and "no index"
     struct no_base_t {
@@ -647,7 +685,7 @@ namespace static_asm::x86 {
 
     // Represents a full SIB address: base + index*scale + displacement
     template<typename Base, typename Index, int Scale, e_displacement_type DispType = e_displacement_type::disp0>
-        requires(Register<Base> || std::same_as<Base, no_base_t>) && (Register<Index> || std::same_as<Index, no_index_t>) && (Scale == 1 || Scale == 2 || Scale == 4 || Scale == 8)
+        requires(Register<Base> || std::same_as<Base, no_base_t>) && (Register<Index> || std::same_as<Index, no_index_t>) && ValidScale<Scale>
     struct address_expr {
         Base base;
         Index index;
@@ -673,18 +711,22 @@ namespace static_asm::x86 {
         }
     };
 
-    // Concept for address expressions
+    // Concept for address expressions - used in SIB addressing
     template<typename T>
     concept AddressExpression = requires {
         { T::scale } -> std::convertible_to<int>;
         { T::disp_type } -> std::convertible_to<e_displacement_type>;
         { T::needs_sib() } -> std::convertible_to<bool>;
-    };
+        { T::has_base } -> std::convertible_to<bool>;
+        { T::has_index } -> std::convertible_to<bool>;
+    } && ValidScale<T::scale>;
 
     // Displacement type concepts (for operator+ overloads)
+    // Displacement8: fits in signed 8-bit (-128 to 127)
     template<typename T>
     concept Displacement8 = Integer<T> && (sizeof(T) == 1);
 
+    // Displacement32: requires 32-bit displacement
     template<typename T>
     concept Displacement32 = Integer<T> && (sizeof(T) > 1 || std::same_as<T, int>);
 
@@ -694,7 +736,7 @@ namespace static_asm::x86 {
 
     // rbx * 4 -> scaled_reg<Reg, 4>
     template<typename Reg, int Scale>
-        requires Register<Reg> && (Scale == 1 || Scale == 2 || Scale == 4 || Scale == 8)
+        requires Register<Reg> && ValidScale<Scale>
     constexpr auto make_scaled_reg(Reg r) {
         return scaled_reg<Reg, Scale>{ r };
     }
@@ -702,6 +744,7 @@ namespace static_asm::x86 {
     // Scale constants for use with operator*
     // Usage: rcx * s4 creates scaled_reg<rcx_type, 4>
     template<int N>
+        requires ValidScale<N>
     struct scale_t {
         static constexpr int value = N;
     };
@@ -714,13 +757,13 @@ namespace static_asm::x86 {
 
     // Define operator* overloads for scale_t
     template<typename Reg, int N>
-        requires Register<Reg> && (N == 1 || N == 2 || N == 4 || N == 8)
+        requires Register<Reg> && ValidScale<N>
     constexpr scaled_reg<Reg, N> operator*(Reg r, scale_t<N>) {
         return scaled_reg<Reg, N>{ r };
     }
 
     template<typename Reg, int N>
-        requires Register<Reg> && (N == 1 || N == 2 || N == 4 || N == 8)
+        requires Register<Reg> && ValidScale<N>
     constexpr scaled_reg<Reg, N> operator*(scale_t<N>, Reg r) {
         return scaled_reg<Reg, N>{ r };
     }
@@ -764,7 +807,7 @@ namespace static_asm::x86 {
     // =========================================================================
 
     template<typename Base, typename Index, int Scale, std::size_t Size, e_displacement_type DispType>
-        requires(Register<Base> || std::same_as<Base, no_base_t>) && (Register<Index> || std::same_as<Index, no_index_t>) && (Scale == 1 || Scale == 2 || Scale == 4 || Scale == 8)
+        requires(Register<Base> || std::same_as<Base, no_base_t>) && (Register<Index> || std::same_as<Index, no_index_t>) && ValidScale<Scale> && ValidOperandSize<Size>
     class sib_memory_operand : base_operand {
     public:
         using base_type = Base;
@@ -801,14 +844,15 @@ namespace static_asm::x86 {
         std::int32_t _displacement;
     };
 
-    // Concept for SIB memory operands
+    // Concept for SIB memory operands - validates scale and structure
     template<typename T>
     concept SIBMemory = requires {
         { T::has_sib } -> std::convertible_to<bool>;
         { T::scale } -> std::convertible_to<int>;
+        { T::size } -> std::convertible_to<std::size_t>;
         typename T::base_type;
         typename T::index_type;
-    } && T::has_sib;
+    } && T::has_sib && ValidScale<T::scale> && ValidOperandSize<T::size>;
 
     // =========================================================================
     // Memory Operand Creation for Address Expressions
