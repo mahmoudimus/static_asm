@@ -4,3 +4,4 @@ cmake-build-release/
 build/
 .cache/
 IGNORED_*
+single_include/
