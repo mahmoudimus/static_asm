@@ -134,13 +134,13 @@ if(STATIC_ASM_BUILD_TESTS)
 
     # Compiler-specific test flags
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT USING_CLANG_CL)
-        target_compile_options(static_asm_tests PRIVATE -O2)
+        target_compile_options(static_asm_tests PRIVATE -O2 -Werror)
         if(MINGW)
             target_compile_options(static_asm_tests PRIVATE -Wa,-mbig-obj)
         endif()
     elseif(MSVC OR USING_CLANG_CL)
         # Only use /O2 in Release mode; Debug mode uses /RTC1 which conflicts with /O2
-        target_compile_options(static_asm_tests PRIVATE /bigobj)
+        target_compile_options(static_asm_tests PRIVATE /bigobj /WX)
         target_compile_options(static_asm_tests PRIVATE $<$<CONFIG:Release>:/O2>)
         # Enable inline expansion in Debug mode to avoid duplicate COMDAT errors
         # from header-only template library (inline constexpr functions)

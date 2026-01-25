@@ -103,7 +103,7 @@ namespace static_asm::x86 {
             }
 
             auto emit = []<typename T>(std::array<std::uint8_t, size>& arr, int& j, const T& value) {
-                for (int i = 0; i < sizeof(T); i++) {
+                for (std::size_t i = 0; i < sizeof(T); i++) {
                     arr[j++] = static_cast<std::uint8_t>(value >> (i * 8));
                 }
             };
