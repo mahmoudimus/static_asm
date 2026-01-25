@@ -63,6 +63,8 @@ elseif(MSVC OR USING_CLANG_CL)
     target_compile_options(static_asm INTERFACE
         /W4 /permissive- /Zc:__cplusplus /bigobj
         /Gy  # Enable function-level linking to handle duplicate COMDATs
+        /wd4068  # Disable unknown pragma warning (we use #pragma clang diagnostic)
+        /wd4244  # Disable conversion warning (intentional truncation of immediates)
     )
 endif()
 
@@ -141,6 +143,9 @@ if(STATIC_ASM_BUILD_TESTS)
     elseif(MSVC OR USING_CLANG_CL)
         # Only use /O2 in Release mode; Debug mode uses /RTC1 which conflicts with /O2
         target_compile_options(static_asm_tests PRIVATE /bigobj /WX)
+        # Disable C4068 (unknown pragma) - we use #pragma clang diagnostic
+        # Disable C4244 (conversion) - intentional truncation of immediates to register size
+        target_compile_options(static_asm_tests PRIVATE /wd4068 /wd4244)
         target_compile_options(static_asm_tests PRIVATE $<$<CONFIG:Release>:/O2>)
         # Enable inline expansion in Debug mode to avoid duplicate COMDAT errors
         # from header-only template library (inline constexpr functions)
