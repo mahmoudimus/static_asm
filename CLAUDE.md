@@ -28,8 +28,7 @@ This is a **header-only C++20 library** for compile-time x86 assembly encoding. 
 ### Key Components
 
 - **`include/static_asm.hpp`** - Main include file (amalgamated header)
-- **`include/static_asm/core/assembler.hpp`** - `assemble()` function to concatenate instruction byte arrays
-- **`include/static_asm/core/emitter.hpp`** - `emit()` for Clang inline assembly (Clang-only, requires -O2)
+- **`include/static_asm/core.hpp`** - `assemble()` and `emit()` functions (emit requires Clang/GCC with -O2)
 
 ### x86 Encoding Layer (`include/static_asm/x86/`)
 

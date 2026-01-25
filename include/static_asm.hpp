@@ -5,8 +5,7 @@
 #define STATIC_ASM_HPP
 
 // Core components
-#include "static_asm/core/assembler.hpp"
-#include "static_asm/core/emitter.hpp"
+#include "static_asm/core.hpp"
 
 // x86 architecture
 #include "static_asm/x86/encoder.hpp"
