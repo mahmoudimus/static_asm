@@ -122,9 +122,10 @@ TEST(SystemInstructions, Rdtscp) {
 // Convenience Instructions
 // =============================================================================
 
-TEST(SystemInstructions, JmpSelf) {
+TEST(SystemInstructions, JmpHere) {
     // JMP $ (infinite loop): EB FE
-    EXPECT_EQ(jmp_self(), (internal::make_array<std::uint8_t>(0xEB, 0xFE)));
+    // Using jmp(here) - the idiomatic way to express "jump to current instruction"
+    EXPECT_EQ(jmp(here), (internal::make_array<std::uint8_t>(0xEB, 0xFE)));
 }
 
 // =============================================================================
@@ -140,15 +141,15 @@ TEST(SystemInstructions, ConstexprEvaluation) {
     constexpr auto iretq_bytes = iretq();
     constexpr auto cpuid_bytes = cpuid();
     constexpr auto rdtsc_bytes = rdtsc();
-    constexpr auto jmp_self_bytes = jmp_self();
+    constexpr auto jmp_here_bytes = jmp(here);
 
     static_assert(syscall_bytes[0] == 0x0F);
     static_assert(syscall_bytes[1] == 0x05);
     static_assert(int3_bytes[0] == 0xCC);
     static_assert(int80_bytes[0] == 0xCD);
     static_assert(int80_bytes[1] == 0x80);
-    static_assert(jmp_self_bytes[0] == 0xEB);
-    static_assert(jmp_self_bytes[1] == 0xFE);
+    static_assert(jmp_here_bytes[0] == 0xEB);
+    static_assert(jmp_here_bytes[1] == 0xFE);
 
     // Suppress unused variable warnings
     (void)sysenter_bytes;
@@ -283,8 +284,8 @@ TEST(ShellcodePatterns, LinuxSyscall64) {
 }
 
 TEST(ShellcodePatterns, InfiniteLoop) {
-    // Simple infinite loop: jmp $
-    constexpr auto loop = jmp_self();
+    // Simple infinite loop: jmp $ using jmp(here)
+    constexpr auto loop = jmp(here);
 
     // EB FE
     EXPECT_EQ(loop.size(), 2u);

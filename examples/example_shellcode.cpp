@@ -18,34 +18,19 @@ using namespace static_asm::x86::instructions;
 //   3. Calls the entry point
 //   4. Loops forever (for demonstration)
 
-// For jmp $ (infinite loop): EB FE = jmp rel8 -2
-// The library doesn't have short jmp yet, so we use raw bytes
-constexpr std::array<std::uint8_t, 2> jmp_self = {0xEB, 0xFE};
-
-// Helper to concatenate arrays at compile time
-template<typename T, std::size_t N1, std::size_t N2>
-constexpr std::array<T, N1 + N2> concat(const std::array<T, N1>& a, const std::array<T, N2>& b) {
-    std::array<T, N1 + N2> result{};
-    for (std::size_t i = 0; i < N1; ++i) result[i] = a[i];
-    for (std::size_t i = 0; i < N2; ++i) result[N1 + i] = b[i];
-    return result;
-}
-
 // Build the complete shellcode at compile time
 constexpr auto build_loader_shellcode(std::uint64_t dll_base, std::uint64_t entry_point) {
     // All instructions use the library's native encoding
     // mov() automatically detects when movabs encoding is needed for 64-bit immediates
-    auto code = core::assemble(
+    return core::assemble(
         sub(rsp, 0x28),              // sub rsp, 0x28 - shadow space for Windows x64 ABI
         mov(rcx, dll_base),          // mov rcx, dllBase (hinstDLL parameter) - auto uses movabs
         mov(rdx, 1),                 // mov rdx, 1 (DLL_PROCESS_ATTACH)
         xor_(r8, r8),                // xor r8, r8 (lpvReserved = NULL)
         mov(rax, entry_point),       // mov rax, entryPoint - auto uses movabs
-        call(rax)                    // call rax
+        call(rax),                   // call rax
+        jmp(here)                    // jmp $ (infinite loop)
     );
-
-    // Append jmp $ (infinite loop) - not yet supported natively
-    return concat(code, jmp_self);
 }
 
 int main() {

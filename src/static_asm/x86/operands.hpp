@@ -18,6 +18,17 @@ namespace static_asm::x86 {
     template <typename T>
     concept IsVoidOperand = std::is_void_v<typename T::value_type>;
 
+    // Tag type representing "current instruction address" ($ in assembly)
+    // Used for jmp(here) which encodes as EB FE (jmp rel8 -2)
+    struct here_t {
+        static constexpr bool extended = false;
+        static constexpr std::size_t size = 0;
+    };
+    inline constexpr here_t here{};
+
+    template <typename T>
+    concept IsHere = std::same_as<std::remove_cvref_t<T>, here_t>;
+
     class base_operand {
     public:
         enum class e_operand_type {

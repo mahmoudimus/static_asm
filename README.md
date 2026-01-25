@@ -161,6 +161,7 @@ imul(ecx, edx, 1000);    // 69 CA E8 03 00 00
 jmp(0x10);               // EB 10 (short, 8-bit offset)
 jmp(0x1000);             // E9 00 10 00 00 (near, 32-bit offset)
 jmp(rax);                // FF E0 (indirect)
+jmp(here);               // EB FE (jmp $, infinite loop)
 
 // Conditional jumps (8-bit offset)
 jz(0x10);                // 74 10

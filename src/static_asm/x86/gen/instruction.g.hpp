@@ -403,6 +403,13 @@ namespace static_asm::x86::instructions {
         return jmp(imm32(address));
     }
 
+    // jmp(here) - infinite loop, encodes as EB FE (jmp rel8 -2)
+    // This is the idiomatic way to express "jmp $" (jump to current instruction)
+    template <typename T> requires IsHere<T>
+    inline constexpr auto jmp([[maybe_unused]] T) {
+        return internal::make_array<std::uint8_t>(0xEB, 0xFE);
+    }
+
     template <typename Address> requires Immediate8<Address>
     inline constexpr auto jnb(Address address) {
         return encode<e_instruction_id::jnb>(address);
@@ -1576,14 +1583,6 @@ namespace static_asm::x86::instructions {
     // Opcode: 0F 01 F9
     inline constexpr auto rdtscp() {
         return encode<e_instruction_id::rdtscp>();
-    }
-
-    // ==========================================================================
-    // Convenience: Infinite loop (jmp $)
-    // ==========================================================================
-    // jmp $ is encoded as EB FE (short jump -2, back to the start of this instruction)
-    inline constexpr auto jmp_self() {
-        return jmp(imm8(0xFE));  // -2 as unsigned byte = 0xFE
     }
 
 }

@@ -18,18 +18,15 @@ constexpr std::array<T, N1 + N2> concat(const std::array<T, N1>& a, const std::a
 // Windows x64 DLL loader shellcode pattern
 // Tests: sub, mov with auto-movabs, xor with extended registers, call
 constexpr auto build_loader_shellcode(std::uint64_t dll_base, std::uint64_t entry_point) {
-    constexpr std::array<std::uint8_t, 2> jmp_self = {0xEB, 0xFE}; // jmp $ (infinite loop)
-
-    auto code = core::assemble(
+    return core::assemble(
         sub(rsp, 0x28),              // sub rsp, 0x28 - shadow space
         mov(rcx, dll_base),          // mov rcx, imm64 (auto movabs)
         mov(rdx, 1),                 // mov rdx, 1
         xor_(r8, r8),                // xor r8, r8
         mov(rax, entry_point),       // mov rax, imm64 (auto movabs)
-        call(rax)                    // call rax
+        call(rax),                   // call rax
+        jmp(here)                    // jmp $ (infinite loop)
     );
-
-    return concat(code, jmp_self);
 }
 
 TEST(ShellcodeTests, DllLoaderStructure) {
