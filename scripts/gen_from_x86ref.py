@@ -13,26 +13,25 @@ Usage:
 """
 
 import xml.etree.ElementTree as ET
-import os
 import sys
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Tuple, Set
 from collections import defaultdict
+from pathlib import Path
 
 import hashlib
 from datetime import datetime, timezone
 
-SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
-XML_PATH = os.path.join(SCRIPT_DIR, 'x86reference.xml')
-SRC_DIR = os.path.join(SCRIPT_DIR, '..', 'src', 'architecture', 'x86')
-GEN_DIR = os.path.join(SRC_DIR, 'gen')
-TEST_DIR = os.path.join(SCRIPT_DIR, '..', 'tests')
+SCRIPT_DIR = Path(__file__).resolve().parent
+XML_PATH = SCRIPT_DIR / 'x86reference.xml'
+SRC_DIR = SCRIPT_DIR.parent / 'include' / 'static_asm' / 'x86'
+GEN_DIR = SRC_DIR / 'gen'
+TEST_DIR = SCRIPT_DIR.parent / 'tests'
 
 
-def get_file_md5(filepath: str) -> str:
+def get_file_md5(filepath: Path) -> str:
     """Calculate MD5 hash of a file."""
-    with open(filepath, 'rb') as f:
-        return hashlib.md5(f.read()).hexdigest()
+    return hashlib.md5(filepath.read_bytes()).hexdigest()
 
 
 def get_generation_preamble() -> str:
@@ -892,28 +891,26 @@ def main():
         print_instruction_details(all_instructions, args.instruction)
     elif args.generate_db:
         # Ensure gen directory exists
-        output_dir = args.output_dir or GEN_DIR
-        os.makedirs(output_dir, exist_ok=True)
+        output_dir = Path(args.output_dir) if args.output_dir else GEN_DIR
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate instruction_db.hpp (types go to parent dir, data goes to gen/)
         db_hpp = generate_instruction_db_hpp(instructions)
-        output_path = os.path.join(os.path.dirname(output_dir), 'instruction_db.gen.hpp')
-        with open(output_path, 'w') as f:
-            f.write(db_hpp)
+        output_path = output_dir.parent / 'instruction_db.gen.hpp'
+        output_path.write_text(db_hpp)
         print(f"Generated: {output_path}")
 
         # Generate instruction_db.g.hpp (into gen/ directory)
         db_g_hpp = generate_instruction_db_g_hpp(instructions)
-        output_path = os.path.join(output_dir, 'instruction_db.g.hpp')
-        with open(output_path, 'w') as f:
-            f.write(db_g_hpp)
+        output_path = output_dir / 'instruction_db.g.hpp'
+        output_path.write_text(db_g_hpp)
         print(f"Generated: {output_path}")
 
     elif args.generate_tests:
         tests = generate_exhaustive_tests(instructions)
-        output_path = os.path.join(args.output_dir or TEST_DIR, 'test_generated.cpp')
-        with open(output_path, 'w') as f:
-            f.write(tests)
+        output_dir = Path(args.output_dir) if args.output_dir else TEST_DIR
+        output_path = output_dir / 'test_generated.cpp'
+        output_path.write_text(tests)
         print(f"Generated: {output_path}")
 
     else:

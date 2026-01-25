@@ -53,7 +53,7 @@ namespace static_asm::x86 {
         constexpr base_operand() = delete;
 
         constexpr base_operand(e_operand_type type)
-            : _type(type) {};
+            : _type(type) {}
 
         constexpr bool is_mem() const {
             return _type == e_operand_type::mem;
