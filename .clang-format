@@ -29,6 +29,7 @@ AlignTrailingComments: false
 
 # Line breaks
 ColumnLimit: 0
+PackConstructorInitializers: CurrentLine
 AllowAllArgumentsOnNextLine: true
 AllowAllParametersOfDeclarationOnNextLine: true
 AllowShortBlocksOnASingleLine: false

@@ -778,7 +778,9 @@ namespace static_asm::x86 {
 
         constexpr sib_memory_operand(address_expr<Base, Index, Scale, DispType> addr)
             : base_operand(e_operand_type::mem),
-              _base(addr.base), _index(addr.index), _displacement(addr.displacement) {}
+              _base(addr.base),
+              _index(addr.index),
+              _displacement(addr.displacement) {}
 
         constexpr Base base() const {
             return _base;
