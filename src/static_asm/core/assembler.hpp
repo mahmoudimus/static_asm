@@ -18,9 +18,9 @@ namespace static_asm::core {
 
         std::array<T, FLATLENGTH> flat_a = { 0 };
 
-        int index = 0;
-        for (int i = 0; i < NB_ARRAY; i++) {
-            for (int j = 0; j < lengths[i]; j++) {
+        size_t index = 0;
+        for (size_t i = 0; i < NB_ARRAY; i++) {
+            for (size_t j = 0; j < lengths[i]; j++) {
                 flat_a[index] = datas[i][j];
                 index++;
             }

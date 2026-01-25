@@ -68,7 +68,7 @@ namespace static_asm::x86 {
 
     template<typename Mem, typename Reg>
         requires Memory<Mem> && Immediate<typename Mem::value_type> && Register<Reg>
-    inline constexpr std::uint8_t encode_modrm(e_mod mod, const Mem& mem, const Reg& reg) {
+    inline constexpr std::uint8_t encode_modrm(e_mod mod, [[maybe_unused]] const Mem& mem, const Reg& reg) {
         return (static_cast<std::uint8_t>(mod) << 6) + ((static_cast<std::uint8_t>(reg.id()) & 0b111) << 3) + (static_cast<std::uint8_t>(0b100) & 0b111);
     }
 
@@ -92,25 +92,25 @@ namespace static_asm::x86 {
 
     template<typename Reg, typename Imm>
         requires Register<Reg> && Immediate<Imm>
-    inline constexpr std::uint8_t encode_modrm(e_opcode_alu_extension ext, const Reg& reg, const Imm& imm) {
+    inline constexpr std::uint8_t encode_modrm(e_opcode_alu_extension ext, const Reg& reg, [[maybe_unused]] const Imm& imm) {
         return encode_modrm_ext(e_mod::register_addressing, static_cast<std::uint8_t>(ext), reg);
     }
 
     template<typename Mem, typename Imm>
         requires Memory<Mem> && Register<typename Mem::value_type> && Immediate<Imm>
-    inline constexpr std::uint8_t encode_modrm(e_opcode_alu_extension ext, const Mem& mem, const Imm& imm) {
+    inline constexpr std::uint8_t encode_modrm(e_opcode_alu_extension ext, const Mem& mem, [[maybe_unused]] const Imm& imm) {
         return encode_modrm_ext(e_mod::register_indirect_addressing, static_cast<std::uint8_t>(ext), mem.value());
     }
 
     template<typename Reg, typename Imm>
         requires Register<Reg> && Immediate<Imm>
-    inline constexpr std::uint8_t encode_modrm(e_mod mod, e_opcode_alu_extension ext, const Reg& reg, const Imm& imm) {
+    inline constexpr std::uint8_t encode_modrm(e_mod mod, e_opcode_alu_extension ext, const Reg& reg, [[maybe_unused]] const Imm& imm) {
         return (static_cast<std::uint8_t>(mod) << 6) + ((static_cast<std::uint8_t>(ext) & 0b111) << 3) + (static_cast<std::uint8_t>(reg.id()) & 0b111);
     }
 
     template<typename Reg, typename Imm>
         requires Register<Reg> && Immediate<Imm>
-    inline constexpr std::uint8_t encode_modrm(e_opcode_bt_extension ext, const Reg& reg, const Imm& imm) {
+    inline constexpr std::uint8_t encode_modrm(e_opcode_bt_extension ext, const Reg& reg, [[maybe_unused]] const Imm& imm) {
         return encode_modrm_ext(e_mod::register_addressing, static_cast<std::uint8_t>(ext), reg);
     }
 

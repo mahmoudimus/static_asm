@@ -46,7 +46,7 @@ namespace static_asm::x86 {
 
     // Legacy function for disp32-only addressing (preserved for compatibility)
     template<typename Op1, typename Op2>
-    inline constexpr std::uint8_t encode_sib_nodisp(const Op1& op1, const Op2& op2) {
+    inline constexpr std::uint8_t encode_sib_nodisp([[maybe_unused]] const Op1& op1, [[maybe_unused]] const Op2& op2) {
         return (static_cast<std::uint8_t>(0b00) << 6) // Scale = 1
                + ((static_cast<std::uint8_t>(0b100) & 0b111) << 3) // index = RSP (no index)
                + (static_cast<std::uint8_t>(0b101) & 0b111); // base = RBP (disp32 follows)

@@ -48,7 +48,7 @@ namespace static_asm::x86 {
 
         template<e_instruction_id Id, typename Op1, typename Op2, typename... Args>
             requires DerivesBaseOperand<Op1> && (DerivesBaseOperand<Op2> || IsVoidOperand<Op2>)
-        inline constexpr auto encode(instruction_desc desc, Args&&... args) {
+        inline constexpr auto encode([[maybe_unused]] instruction_desc desc, Args&&... args) {
             auto tuple = std::make_tuple(std::forward<Args>(args)...);
 
             auto has_rex = []() constexpr {
@@ -169,7 +169,7 @@ namespace static_asm::x86 {
 
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires(Register<Op1> || Memory<Op1>) && (Register<Op2> || Memory<Op2> || Immediate<Op2>)
-    inline constexpr auto encode_alu(instruction_desc desc, Op1 op1, Op2 op2) {
+    inline constexpr auto encode_alu([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
         auto id = desc.id();
         auto opcode = desc.primary_opcode();
 
@@ -208,7 +208,7 @@ namespace static_asm::x86 {
 
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Integer<Op2>
-    inline constexpr auto encode_alu(instruction_desc desc, const Op1& op1, const Op2& op2) {
+    inline constexpr auto encode_alu([[maybe_unused]] instruction_desc desc, const Op1& op1, const Op2& op2) {
         return encode_alu<Id>(desc, op1, immediate<typename truncate_as<Op1>::type>(op2));
     }
 
@@ -219,7 +219,7 @@ namespace static_asm::x86 {
     // encode_modrm(reg1, reg2) puts reg2 in REG and reg1 in R/M, so we swap the order
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Register<Op1> && (Register<Op2> || Memory<Op2>)
-    inline constexpr auto encode_bitscan(instruction_desc desc, const Op1& op1, const Op2& op2) {
+    inline constexpr auto encode_bitscan([[maybe_unused]] instruction_desc desc, const Op1& op1, const Op2& op2) {
         auto opcode = desc.primary_opcode(); // 0xBC for BSF, 0xBD for BSR
 
         // Swap operand order: op2 (source) in r/m, op1 (dest) in reg
@@ -231,7 +231,7 @@ namespace static_asm::x86 {
     // Format: BSWAP r32/64
     template<e_instruction_id Id, typename Op1>
         requires Register<Op1> && (Op1::size == 32 || Op1::size == 64)
-    inline constexpr auto encode_bswap(instruction_desc desc, const Op1& op1) {
+    inline constexpr auto encode_bswap([[maybe_unused]] instruction_desc desc, const Op1& op1) {
         auto base_opcode = desc.primary_opcode(); // 0xC8
         // Lower 3 bits of register ID are encoded in opcode
         auto opcode = static_cast<std::uint8_t>(base_opcode + (static_cast<std::uint8_t>(op1.id()) & 0x07));
@@ -257,7 +257,7 @@ namespace static_asm::x86 {
 
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires(Register<Op1> || Memory<Op1>) && (Register<Op2> || Memory<Op2> || Immediate<Op2>)
-    inline constexpr auto encode_bt(instruction_desc desc, Op1 op1, Op2 op2) {
+    inline constexpr auto encode_bt([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
         auto id = desc.id();
         auto opcode = desc.primary_opcode();
 
@@ -277,12 +277,12 @@ namespace static_asm::x86 {
 
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Integer<Op2>
-    inline constexpr auto encode_bt(instruction_desc desc, const Op1& op1, const Op2& op2) {
+    inline constexpr auto encode_bt([[maybe_unused]] instruction_desc desc, const Op1& op1, const Op2& op2) {
         return encode_bt<Id>(desc, op1, immediate<std::uint8_t>(op2));
     }
 
     template<e_instruction_id Id, typename Op1>
-    inline constexpr auto encode_call(instruction_desc desc, const Op1& op1) {
+    inline constexpr auto encode_call([[maybe_unused]] instruction_desc desc, const Op1& op1) {
         auto id = desc.id();
         auto opcode = desc.primary_opcode();
 
@@ -299,13 +299,13 @@ namespace static_asm::x86 {
 
     template<e_instruction_id Id, typename Op1>
         requires Integer<Op1>
-    inline constexpr auto encode_call(instruction_desc desc, const Op1& op1) {
+    inline constexpr auto encode_call([[maybe_unused]] instruction_desc desc, const Op1& op1) {
         return encode_call<Id>(desc, immediate<std::uint32_t>(op1));
     }
 
     template<e_instruction_id Id, typename Op1>
         requires Immediate8<Op1>
-    inline constexpr auto encode_jcc(instruction_desc desc, Op1 op1) {
+    inline constexpr auto encode_jcc([[maybe_unused]] instruction_desc desc, Op1 op1) {
         auto opcode = desc.primary_opcode();
 
         return internal::encode<Id, Op1, Void>(desc, opcode, op1.value());
@@ -314,7 +314,7 @@ namespace static_asm::x86 {
     // Near conditional jump encoder (rel32 offset, 0F 8x opcodes)
     template<e_instruction_id Id, typename Op1>
         requires std::same_as<Op1, imm32>
-    inline constexpr auto encode_jcc_near(instruction_desc desc, Op1 op1) {
+    inline constexpr auto encode_jcc_near([[maybe_unused]] instruction_desc desc, Op1 op1) {
         auto opcode = desc.primary_opcode();
 
         return internal::encode<Id, Op1, Void>(desc, opcode, op1.value());
@@ -322,7 +322,7 @@ namespace static_asm::x86 {
 
     template<e_instruction_id Id, typename Op1>
         requires(Immediate<Op1> || Register<Op1> || (Memory<Op1> && Register<typename Op1::value_type>))
-    inline constexpr auto encode_jmp(instruction_desc desc, Op1 op1) {
+    inline constexpr auto encode_jmp([[maybe_unused]] instruction_desc desc, Op1 op1) {
         auto id = desc.id();
         auto opcode = desc.primary_opcode();
 
@@ -380,7 +380,7 @@ namespace static_asm::x86 {
     // For 64-bit, we still use C7 (sign-extended imm32) as it's shorter than movabs
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Register<Op1> && Immediate<Op2> && (Op1::size <= 32)
-    inline constexpr auto encode_mov(instruction_desc desc, Op1 op1, Op2 op2) {
+    inline constexpr auto encode_mov([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
         // B0+rb for 8-bit, B8+rd for 16/32-bit
         constexpr std::uint8_t base_opcode = Op1::size == 8 ? 0xB0 : 0xB8;
         auto reg_id = static_cast<std::uint8_t>(op1.id()) & 0x07;
@@ -436,7 +436,7 @@ namespace static_asm::x86 {
     // memory-immediate, and 64-bit register-immediate (uses C6/C7 ModR/M form)
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires((Register<Op1> || Memory<Op1>) && (Register<Op2> || Memory<Op2> || Immediate<Op2>) && !(Register<Op1> && Immediate<Op2> && (Op1::size <= 32)))
-    inline constexpr auto encode_mov(instruction_desc desc, Op1 op1, Op2 op2) {
+    inline constexpr auto encode_mov([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
         auto opcode = desc.primary_opcode();
 
         if constexpr (Immediate<Op2>) {
@@ -456,7 +456,7 @@ namespace static_asm::x86 {
 
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Integer<Op2>
-    inline constexpr auto encode_mov(instruction_desc desc, const Op1& op1, const Op2& op2) {
+    inline constexpr auto encode_mov([[maybe_unused]] instruction_desc desc, const Op1& op1, const Op2& op2) {
         if constexpr (Id == e_instruction_id::movabs) {
             return encode_mov<Id>(desc, op1, immediate<std::uint64_t>(op2));
         } else {
@@ -470,7 +470,7 @@ namespace static_asm::x86 {
 
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Register<Op1> && SIBMemory<Op2>
-    inline constexpr auto encode_mov_sib(instruction_desc desc, Op1 op1, Op2 op2) {
+    inline constexpr auto encode_mov_sib([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
         // Opcode for mov reg, r/m (8B for 32/64-bit, 8A for 8-bit)
         std::uint8_t opcode = Op1::size == 8 ? 0x8A : 0x8B;
 
@@ -522,7 +522,7 @@ namespace static_asm::x86 {
     // SIB Encoding for MOV: mov [base + index*scale + disp], reg
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires SIBMemory<Op1> && Register<Op2>
-    inline constexpr auto encode_mov_sib(instruction_desc desc, Op1 op1, Op2 op2) {
+    inline constexpr auto encode_mov_sib([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
         // Opcode for mov r/m, reg (89 for 32/64-bit, 88 for 8-bit)
         std::uint8_t opcode = Op2::size == 8 ? 0x88 : 0x89;
 
@@ -576,7 +576,7 @@ namespace static_asm::x86 {
 
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Register<Op1> && SIBMemory<Op2>
-    inline constexpr auto encode_alu_sib(instruction_desc desc, Op1 op1, Op2 op2) {
+    inline constexpr auto encode_alu_sib([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
         // Get base opcode and adjust for direction bit (reg, r/m -> d=1, so opcode | 0x02)
         auto opcode = desc.primary_opcode();
         opcode = encode_opcode_alu<Op1, Op2>(opcode);
@@ -630,7 +630,7 @@ namespace static_asm::x86 {
     // ALU with SIB memory as destination
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires SIBMemory<Op1> && Register<Op2>
-    inline constexpr auto encode_alu_sib(instruction_desc desc, Op1 op1, Op2 op2) {
+    inline constexpr auto encode_alu_sib([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
         auto opcode = desc.primary_opcode();
         // For mem, reg: d=0, direction bit clear
         opcode = static_cast<std::uint8_t>((opcode & 0xFC) | (Op2::size > 8 ? 1 : 0));
@@ -685,7 +685,7 @@ namespace static_asm::x86 {
 
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Register<Op1> && SIBMemory<Op2>
-    inline constexpr auto encode_lea_sib(instruction_desc desc, Op1 op1, Op2 op2) {
+    inline constexpr auto encode_lea_sib([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
         std::uint8_t opcode = 0x8D; // LEA opcode
 
         auto modrm = encode_modrm_sib(op1, op2);
@@ -734,7 +734,7 @@ namespace static_asm::x86 {
 
     template<e_instruction_id Id, typename Op1>
         requires Register<Op1>
-    inline constexpr auto encode_pop(instruction_desc desc, const Op1& op1) {
+    inline constexpr auto encode_pop([[maybe_unused]] instruction_desc desc, const Op1& op1) {
         auto primary_opcode = desc.primary_opcode();
 
         if constexpr (Op1::extended) {
@@ -749,7 +749,7 @@ namespace static_asm::x86 {
 
     template<e_instruction_id Id, typename Op1>
         requires(Register<Op1> || (Immediate<Op1> && (Op1::size == 8 || Op1::size == 32)))
-    inline constexpr auto encode_push(instruction_desc desc, const Op1& op1) {
+    inline constexpr auto encode_push([[maybe_unused]] instruction_desc desc, const Op1& op1) {
         auto primary_opcode = desc.primary_opcode();
 
         if constexpr (Immediate<Op1>) {
@@ -773,13 +773,13 @@ namespace static_asm::x86 {
     }
 
     template<e_instruction_id Id>
-    inline constexpr auto encode_push(instruction_desc desc, const std::uint32_t& val) {
+    inline constexpr auto encode_push([[maybe_unused]] instruction_desc desc, const std::uint32_t& val) {
         return encode_push<Id, imm32>(desc, imm32(val));
     }
 
     template<e_instruction_id Id, typename Op1>
         requires Immediate<Op1>
-    inline constexpr auto encode_ret(instruction_desc desc, const Op1& op1) {
+    inline constexpr auto encode_ret([[maybe_unused]] instruction_desc desc, const Op1& op1) {
         auto value = static_cast<std::uint16_t>(op1.value());
 
         auto opcode = static_cast<std::uint8_t>(desc.primary_opcode() - 1);
@@ -788,7 +788,7 @@ namespace static_asm::x86 {
 
     template<e_instruction_id Id, typename Op1>
         requires Integer<Op1>
-    inline constexpr auto encode_ret(instruction_desc desc, const Op1& op1) {
+    inline constexpr auto encode_ret([[maybe_unused]] instruction_desc desc, const Op1& op1) {
         return encode_ret<Id>(desc, immediate<std::uint16_t>(op1));
     }
 
@@ -796,7 +796,7 @@ namespace static_asm::x86 {
     // These use opcode extension in ModR/M reg field
     template<e_instruction_id Id, typename Op1>
         requires Register<Op1>
-    inline constexpr auto encode_unary(instruction_desc desc, const Op1& op1) {
+    inline constexpr auto encode_unary([[maybe_unused]] instruction_desc desc, const Op1& op1) {
         // Opcode: FE for 8-bit, FF for 16/32/64-bit (INC/DEC)
         //         F6 for 8-bit, F7 for 16/32/64-bit (NEG/NOT)
         auto opcode = desc.primary_opcode();
@@ -823,7 +823,7 @@ namespace static_asm::x86 {
     // TEST instruction: reg-reg or reg-imm
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Register<Op1> && Register<Op2>
-    inline constexpr auto encode_test(instruction_desc desc, const Op1& op1, const Op2& op2) {
+    inline constexpr auto encode_test([[maybe_unused]] instruction_desc desc, const Op1& op1, const Op2& op2) {
         // TEST r/m, r: opcode 84 (8-bit) or 85 (16/32/64-bit)
         auto opcode = desc.primary_opcode(); // 0x85
 
@@ -842,7 +842,7 @@ namespace static_asm::x86 {
 
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Register<Op1> && Immediate<Op2>
-    inline constexpr auto encode_test(instruction_desc desc, const Op1& op1, const Op2& op2) {
+    inline constexpr auto encode_test([[maybe_unused]] instruction_desc desc, const Op1& op1, const Op2& op2) {
         // TEST r/m, imm: opcode F6 /0 (8-bit) or F7 /0 (16/32/64-bit)
         std::uint8_t opcode = Op1::size == 8 ? 0xF6 : 0xF7;
 
@@ -911,14 +911,14 @@ namespace static_asm::x86 {
 
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Register<Op1> && Integer<Op2>
-    inline constexpr auto encode_test(instruction_desc desc, const Op1& op1, const Op2& op2) {
+    inline constexpr auto encode_test([[maybe_unused]] instruction_desc desc, const Op1& op1, const Op2& op2) {
         return encode_test<Id>(desc, op1, immediate<typename truncate_as<Op1>::type>(op2));
     }
 
     // LEA instruction: load effective address
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Register<Op1> && Memory<Op2>
-    inline constexpr auto encode_lea(instruction_desc desc, const Op1& op1, const Op2& op2) {
+    inline constexpr auto encode_lea([[maybe_unused]] instruction_desc desc, const Op1& op1, const Op2& op2) {
         auto opcode = desc.primary_opcode(); // 0x8D
         return internal::encode<Id, Op1, Op2>(desc, opcode, encode_modrm(op1, op2));
     }
@@ -926,7 +926,7 @@ namespace static_asm::x86 {
     // MUL/DIV/IMUL/IDIV - single operand with opcode extension (same pattern as unary)
     template<e_instruction_id Id, typename Op1>
         requires Register<Op1>
-    inline constexpr auto encode_muldiv(instruction_desc desc, const Op1& op1) {
+    inline constexpr auto encode_muldiv([[maybe_unused]] instruction_desc desc, const Op1& op1) {
         // Opcode: F6 for 8-bit, F7 for 16/32/64-bit
         auto opcode = desc.primary_opcode(); // 0xF7
         auto ext = desc.secondary_opcode(); // 4=MUL, 5=IMUL, 6=DIV, 7=IDIV
@@ -961,7 +961,7 @@ namespace static_asm::x86 {
     // Shift by 1 (implicit)
     template<e_instruction_id Id, typename Op1>
         requires Register<Op1>
-    inline constexpr auto encode_shift_by_one(instruction_desc desc, const Op1& op1) {
+    inline constexpr auto encode_shift_by_one([[maybe_unused]] instruction_desc desc, const Op1& op1) {
         // Opcode: D0 for 8-bit, D1 for 16/32/64-bit
         std::uint8_t opcode = Op1::size == 8 ? 0xD0 : 0xD1;
         auto ext = desc.secondary_opcode(); // opcode extension (4=SHL, 5=SHR, 7=SAR, 0=ROL, 1=ROR, 2=RCL, 3=RCR)
@@ -981,7 +981,7 @@ namespace static_asm::x86 {
     // Shift by CL register
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Register<Op1> && IsCLRegister<Op2>
-    inline constexpr auto encode_shift_by_cl(instruction_desc desc, const Op1& op1, const Op2& op2) {
+    inline constexpr auto encode_shift_by_cl([[maybe_unused]] instruction_desc desc, const Op1& op1, [[maybe_unused]] const Op2& op2) {
         // Opcode: D2 for 8-bit, D3 for 16/32/64-bit
         std::uint8_t opcode = Op1::size == 8 ? 0xD2 : 0xD3;
         auto ext = desc.secondary_opcode();
@@ -1001,7 +1001,7 @@ namespace static_asm::x86 {
     // Shift by immediate
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Register<Op1> && Immediate8<Op2>
-    inline constexpr auto encode_shift_by_imm(instruction_desc desc, const Op1& op1, const Op2& op2) {
+    inline constexpr auto encode_shift_by_imm([[maybe_unused]] instruction_desc desc, const Op1& op1, const Op2& op2) {
         // Opcode: C0 for 8-bit, C1 for 16/32/64-bit
         std::uint8_t opcode = Op1::size == 8 ? 0xC0 : 0xC1;
         auto ext = desc.secondary_opcode();
@@ -1023,7 +1023,7 @@ namespace static_asm::x86 {
     // Shift by integer (converted to immediate)
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Register<Op1> && Integer<Op2>
-    inline constexpr auto encode_shift(instruction_desc desc, const Op1& op1, const Op2& op2) {
+    inline constexpr auto encode_shift([[maybe_unused]] instruction_desc desc, const Op1& op1, const Op2& op2) {
         return encode_shift_by_imm<Id>(desc, op1, imm8(static_cast<std::uint8_t>(op2)));
     }
 
@@ -1032,7 +1032,7 @@ namespace static_asm::x86 {
     // Encoding: 0F 4x /r (opcode is in primary_opcode, 0F prefix handled by internal::encode)
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Register<Op1> && Register<Op2>
-    inline constexpr auto encode_cmov(instruction_desc desc, const Op1& op1, const Op2& op2) {
+    inline constexpr auto encode_cmov([[maybe_unused]] instruction_desc desc, const Op1& op1, const Op2& op2) {
         auto opcode = desc.primary_opcode();
         // CMOV: destination is in reg field, source is in r/m field
         // ModR/M: mod=11 (register), reg=destination, r/m=source
@@ -1041,7 +1041,7 @@ namespace static_asm::x86 {
 
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Register<Op1> && Memory<Op2>
-    inline constexpr auto encode_cmov(instruction_desc desc, const Op1& op1, const Op2& op2) {
+    inline constexpr auto encode_cmov([[maybe_unused]] instruction_desc desc, const Op1& op1, const Op2& op2) {
         auto opcode = desc.primary_opcode();
         // CMOV r, m: destination register in reg field, memory in r/m field
         return internal::encode<Id, Op1, Op2>(desc, opcode, encode_modrm(op1, op2));
@@ -1051,7 +1051,7 @@ namespace static_asm::x86 {
     // Note: op1 (destination) goes in REG field, op2 (source) goes in R/M field
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Register<Op1> && (Register<Op2> || Memory<Op2>)
-    inline constexpr auto encode_imul_two(instruction_desc desc, const Op1& op1, const Op2& op2) {
+    inline constexpr auto encode_imul_two([[maybe_unused]] instruction_desc desc, const Op1& op1, const Op2& op2) {
         auto opcode = desc.primary_opcode(); // 0xAF
 
         if constexpr (Register<Op2>) {
@@ -1083,7 +1083,7 @@ namespace static_asm::x86 {
     // 69 /r iw/id - IMUL r, r/m, imm16/32
     template<e_instruction_id Id, typename Op1, typename Op2, typename Op3>
         requires Register<Op1> && (Register<Op2> || Memory<Op2>) && Immediate<Op3>
-    inline constexpr auto encode_imul_three(instruction_desc desc, const Op1& op1, const Op2& op2, const Op3& op3) {
+    inline constexpr auto encode_imul_three([[maybe_unused]] instruction_desc desc, const Op1& op1, const Op2& op2, const Op3& op3) {
         // Determine opcode based on immediate size
         // 0x6B for imm8 (sign-extended), 0x69 for imm16/32
         constexpr bool use_imm8 = Op3::size == 8;
@@ -1197,7 +1197,7 @@ namespace static_asm::x86 {
     // IMUL three-operand with integer literal (convenience overload)
     template<e_instruction_id Id, typename Op1, typename Op2, typename Op3>
         requires Register<Op1> && (Register<Op2> || Memory<Op2>) && Integer<Op3>
-    inline constexpr auto encode_imul_three(instruction_desc desc, const Op1& op1, const Op2& op2, const Op3& op3) {
+    inline constexpr auto encode_imul_three([[maybe_unused]] instruction_desc desc, const Op1& op1, const Op2& op2, const Op3& op3) {
         // Choose immediate size based on value
         // If value fits in signed 8-bit, use imm8 for smaller encoding
         if constexpr (sizeof(Op3) == 1) {
@@ -1211,7 +1211,7 @@ namespace static_asm::x86 {
     // XCHG instruction: exchange register contents
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Register<Op1> && Register<Op2>
-    inline constexpr auto encode_xchg(instruction_desc desc, const Op1& op1, const Op2& op2) {
+    inline constexpr auto encode_xchg([[maybe_unused]] instruction_desc desc, const Op1& op1, const Op2& op2) {
         // XCHG has a short form for xchg rax, r: 90+rd
         // But for simplicity, we'll use the general form: 86 /r (8-bit), 87 /r (16/32/64-bit)
         auto opcode = desc.primary_opcode(); // 0x87
@@ -1254,7 +1254,7 @@ namespace static_asm::x86 {
     // MOVZX/MOVSX: register to register (8-bit source)
     template<e_instruction_id Id, typename Dest, typename Src>
         requires Register<Dest> && Register8<Src> && (Dest::size >= 16)
-    inline constexpr auto encode_movzx_movsx(instruction_desc desc, const Dest& dest, const Src& src) {
+    inline constexpr auto encode_movzx_movsx([[maybe_unused]] instruction_desc desc, const Dest& dest, const Src& src) {
         // Opcode: B6 (MOVZX from 8-bit) or BE (MOVSX from 8-bit)
         auto opcode = desc.primary_opcode();
 
@@ -1306,7 +1306,7 @@ namespace static_asm::x86 {
     // MOVZX/MOVSX: register to register (16-bit source)
     template<e_instruction_id Id, typename Dest, typename Src>
         requires Register<Dest> && Register16<Src> && (Dest::size >= 32)
-    inline constexpr auto encode_movzx_movsx(instruction_desc desc, const Dest& dest, const Src& src) {
+    inline constexpr auto encode_movzx_movsx([[maybe_unused]] instruction_desc desc, const Dest& dest, const Src& src) {
         // Opcode: B7 (MOVZX from 16-bit) or BF (MOVSX from 16-bit)
         auto opcode = static_cast<std::uint8_t>(desc.primary_opcode() + 1);
 
@@ -1344,7 +1344,7 @@ namespace static_asm::x86 {
     // MOVZX/MOVSX: memory to register (8-bit source)
     template<e_instruction_id Id, typename Dest, typename Src>
         requires Register<Dest> && Memory<Src> && (Dest::size >= 16) && (Src::size == 8)
-    inline constexpr auto encode_movzx_movsx(instruction_desc desc, const Dest& dest, const Src& src) {
+    inline constexpr auto encode_movzx_movsx([[maybe_unused]] instruction_desc desc, const Dest& dest, const Src& src) {
         auto opcode = desc.primary_opcode(); // B6 or BE
 
         // ModR/M for memory operand
@@ -1385,7 +1385,7 @@ namespace static_asm::x86 {
     // MOVZX/MOVSX: memory to register (16-bit source)
     template<e_instruction_id Id, typename Dest, typename Src>
         requires Register<Dest> && Memory<Src> && (Dest::size >= 32) && (Src::size == 16)
-    inline constexpr auto encode_movzx_movsx(instruction_desc desc, const Dest& dest, const Src& src) {
+    inline constexpr auto encode_movzx_movsx([[maybe_unused]] instruction_desc desc, const Dest& dest, const Src& src) {
         auto opcode = static_cast<std::uint8_t>(desc.primary_opcode() + 1); // B7 or BF
 
         auto modrm = encode_modrm(dest, src);
@@ -1427,7 +1427,7 @@ namespace static_asm::x86 {
     // MOVSXD: register to register (32-bit source to 64-bit destination)
     template<e_instruction_id Id, typename Dest, typename Src>
         requires Register64<Dest> && Register32<Src>
-    inline constexpr auto encode_movsxd(instruction_desc desc, const Dest& dest, const Src& src) {
+    inline constexpr auto encode_movsxd([[maybe_unused]] instruction_desc desc, const Dest& dest, const Src& src) {
         auto opcode = desc.primary_opcode(); // 0x63
 
         // ModR/M: mod=11 (register), reg=destination, r/m=source
@@ -1450,7 +1450,7 @@ namespace static_asm::x86 {
     // MOVSXD: memory to register (32-bit source to 64-bit destination)
     template<e_instruction_id Id, typename Dest, typename Src>
         requires Register64<Dest> && Memory<Src> && (Src::size == 32)
-    inline constexpr auto encode_movsxd(instruction_desc desc, const Dest& dest, const Src& src) {
+    inline constexpr auto encode_movsxd([[maybe_unused]] instruction_desc desc, const Dest& dest, const Src& src) {
         auto opcode = desc.primary_opcode(); // 0x63
 
         auto modrm = encode_modrm(dest, src);

@@ -26,7 +26,7 @@ namespace static_asm::core {
     template<typename T>
         requires Uint8Array<T, typename T::value_type, std::tuple_size_v<T>>
     constexpr inline void emit(T array) {
-        for (int i = 0; i < sizeof(array); i++) {
+        for (size_t i = 0; i < sizeof(array); i++) {
             asm volatile(".byte %c0" ::[a] "i"(static_cast<std::uint8_t>(array[i])));
         }
     }
