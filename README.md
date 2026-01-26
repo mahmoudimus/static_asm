@@ -420,29 +420,6 @@ Note: The `core::emit()` inline assembly feature requires Clang with -O2 optimiz
 
 **Note**: No SIMD/AVX extensions yet.
 
-## Project Structure
-
-```
-static_asm/
-├── include/
-│   ├── static_asm.hpp         # Main include file (amalgamated header)
-│   └── static_asm/
-│       ├── core/
-│       │   ├── assembler.hpp      # assemble() function
-│       │   └── emitter.hpp        # emit() for Clang inline asm
-│       └── x86/
-│           ├── operands.hpp       # Register, memory, immediate types
-│           ├── encoder.hpp        # Instruction encoding logic
-│           ├── modrm.hpp          # ModR/M byte encoding
-│           ├── rex.hpp            # REX prefix encoding
-│           ├── sib.hpp            # SIB byte encoding
-│           ├── instruction_db.hpp # Instruction database types
-│           └── gen/
-│               ├── instruction.g.hpp      # Instruction wrapper functions
-│               └── instruction_db.g.hpp   # Generated instruction database
-└── tests/
-```
-
 ## Developing
 
 ### Environment Setup
