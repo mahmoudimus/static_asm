@@ -10,20 +10,162 @@ on:
         description: 'Release tag name (e.g. v1.0.0). If empty, uses latest tag.'
         required: false
         default: ''
+  workflow_run:
+    workflows: [CI]
+    types:
+      - completed
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref || github.run_id }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
 
 jobs:
-  release:
+  # Release triggered by CI completion - only if a v* tag points at the tested commit
+  release-from-ci:
     runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-tags: true
+
+      - name: Check for version tag
+        id: version
+        run: |
+          # Get tags pointing at this exact commit
+          TAGS=$(git tag --points-at HEAD | tr -d '\r')
+          echo "Found tags at HEAD:"
+          printf '%s\n' "$TAGS"
+          # Pick the first v* tag (if any)
+          TAG=$(printf '%s\n' "$TAGS" | grep -E '^v' | head -n1 || true)
+          if [ -z "$TAG" ]; then
+            echo "No v* tag points at ${{ github.event.workflow_run.head_sha }}; skipping release."
+            echo "should_release=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "should_release=true" >> $GITHUB_OUTPUT
+
+      - name: Skip if release already exists
+        id: guard
+        if: steps.version.outputs.should_release == 'true'
+        run: |
+          if gh release view "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "Release ${{ steps.version.outputs.tag }} already exists, skipping."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        if: steps.version.outputs.should_release == 'true' && steps.guard.outputs.skip == 'false'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install quom
+        if: steps.version.outputs.should_release == 'true' && steps.guard.outputs.skip == 'false'
+        run: pip install quom
+
+      - name: Generate single-header
+        if: steps.version.outputs.should_release == 'true' && steps.guard.outputs.skip == 'false'
+        run: |
+          mkdir -p single_include
+          VERSION=${{ steps.version.outputs.tag }}
+
+          cat > /tmp/header.txt << EOF
+          // static_asm - Compile-time x86/x86-64 assembler for C++20
+          // Version: ${VERSION}
+          // https://github.com/mahmoudimus/static_asm
+          //
+          // SPDX-License-Identifier: BSL-1.0 OR MIT
+          //
+          // Licensed under either:
+          //   - Boost Software License 1.0 (https://www.boost.org/LICENSE_1_0.txt)
+          //   - MIT License (https://opensource.org/licenses/MIT)
+          //
+          // This is a single-header amalgamation of the static_asm library.
+          // For the modular source files, see the repository.
+          //
+          // Original work by Midi12 (https://github.com/Midi12)
+          // Extended by Mahmoud Abdelkader (https://github.com/mahmoudimus)
+          //
+
+          EOF
+
+          quom include/static_asm.hpp /tmp/amalgamated.hpp \
+            -I include -I src --trim
+          cat /tmp/header.txt /tmp/amalgamated.hpp > single_include/static_asm.hpp
+
+          echo "Generated single_include/static_asm.hpp"
+          wc -l single_include/static_asm.hpp
+
+      - name: Test single-header
+        if: steps.version.outputs.should_release == 'true' && steps.guard.outputs.skip == 'false'
+        run: |
+          cat > /tmp/test.cpp << 'EOF'
+          #include "single_include/static_asm.hpp"
+          using namespace static_asm::x86::registers;
+          using namespace static_asm::x86::instructions;
+          int main() {
+              constexpr auto code = static_asm::core::assemble(mov(rax, rbx), ret());
+              static_assert(code.size() == 4);
+              return 0;
+          }
+          EOF
+          g++ -std=c++20 -I. /tmp/test.cpp -o /tmp/test && /tmp/test
+          echo "Single-header test passed!"
+
+      - name: Create Release
+        if: steps.version.outputs.should_release == 'true' && steps.guard.outputs.skip == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: single_include/static_asm.hpp
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          generate_release_notes: true
+          body: |
+            ## Installation
+
+            ### Single Header (recommended)
+            Download `static_asm.hpp` and add to your project:
+            ```cpp
+            #include "static_asm.hpp"
+            ```
+
+            ### CMake
+            ```cmake
+            FetchContent_Declare(
+              static_asm
+              GIT_REPOSITORY https://github.com/mahmoudimus/static_asm.git
+              GIT_TAG ${{ steps.version.outputs.tag }}
+            )
+            FetchContent_MakeAvailable(static_asm)
+            target_link_libraries(your_target PRIVATE static_asm)
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Release triggered by tag push or manual dispatch (fallback/manual override)
+  release-direct:
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') ||
+      github.event_name == 'workflow_dispatch'
     steps:
       - name: Determine version
         id: version
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.tag }}" ]; then
             TAG='${{ github.event.inputs.tag }}'
-            # Ensure tag has v prefix
             if [[ "$TAG" != v* ]]; then TAG="v$TAG"; fi
             echo "tag=$TAG" >> $GITHUB_OUTPUT
             echo "ref=refs/tags/$TAG" >> $GITHUB_OUTPUT
@@ -65,7 +207,6 @@ jobs:
           mkdir -p single_include
           VERSION=${{ steps.version.outputs.tag }}
 
-          # Generate header
           cat > /tmp/header.txt << EOF
           // static_asm - Compile-time x86/x86-64 assembler for C++20
           // Version: ${VERSION}
@@ -86,11 +227,8 @@ jobs:
 
           EOF
 
-          # Generate amalgamation
           quom include/static_asm.hpp /tmp/amalgamated.hpp \
             -I include -I src --trim
-
-          # Combine
           cat /tmp/header.txt /tmp/amalgamated.hpp > single_include/static_asm.hpp
 
           echo "Generated single_include/static_asm.hpp"

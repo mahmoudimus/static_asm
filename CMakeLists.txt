@@ -153,7 +153,9 @@ if(STATIC_ASM_BUILD_TESTS)
     endif()
 
     include(GoogleTest)
-    gtest_discover_tests(static_asm_tests)
+    gtest_discover_tests(static_asm_tests
+        DISCOVERY_TIMEOUT 30  # MSVC Debug builds need more time for test discovery
+    )
 endif()
 
 # Examples
