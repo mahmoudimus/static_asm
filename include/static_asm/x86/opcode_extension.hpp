@@ -1,6 +1,19 @@
 #pragma once
 
+#include "instruction_db.hpp"
+
 namespace static_asm::x86 {
+
+    // C++20 compatible unreachable marker
+    namespace detail {
+        [[noreturn]] inline void unreachable_impl() {
+#if defined(_MSC_VER) && !defined(__clang__)
+            __assume(false);
+#else
+            __builtin_unreachable();
+#endif
+        }
+    } // namespace detail
 
     enum class e_opcode_alu_extension {
         add = 0b000, // 0
@@ -25,8 +38,6 @@ namespace static_asm::x86 {
         jmp = 0b100, // 4
     };
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wreturn-type"
     inline constexpr e_opcode_alu_extension opcodeext_alu(const e_instruction_id& id) {
         switch (id) {
         case e_instruction_id::add:
@@ -46,7 +57,7 @@ namespace static_asm::x86 {
         case e_instruction_id::cmp:
             return e_opcode_alu_extension::cmp;
         default:
-            static_assert("invalid instruction id");
+            detail::unreachable_impl();
         }
     }
 
@@ -61,7 +72,7 @@ namespace static_asm::x86 {
         case e_instruction_id::bts:
             return e_opcode_bt_extension::bts;
         default:
-            static_assert("invalid instruction id");
+            detail::unreachable_impl();
         }
     }
 
@@ -72,9 +83,8 @@ namespace static_asm::x86 {
         case e_instruction_id::jmp:
             return e_opcode_ff_extension::jmp;
         default:
-            static_assert("invalid instruction id");
+            detail::unreachable_impl();
         }
     }
-#pragma clang diagnostic pop
 
 } // namespace static_asm::x86
