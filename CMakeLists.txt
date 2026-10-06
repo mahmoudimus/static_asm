@@ -101,6 +101,7 @@ if(STATIC_ASM_BUILD_TESTS)
     set(TEST_SOURCES
         tests/test_main.cpp
         tests/test_alu.cpp
+        tests/test_asm_block.cpp
         tests/test_bitscan.cpp
         tests/test_bt.cpp
         tests/test_call.cpp

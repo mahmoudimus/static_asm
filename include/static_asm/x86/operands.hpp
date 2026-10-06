@@ -943,6 +943,27 @@ namespace static_asm::x86 {
         return address_expr<Base, Index, 1, e_displacement_type::disp0>{ b, i, 0 };
     }
 
+    // rax + disp -> address_expr<rax, no_index, 1, disp> (base + displacement,
+    // no index register). The displacement width follows the operand type, as
+    // elsewhere in this header: an 8-bit integer selects disp8, anything wider
+    // selects disp32 (write `rcx + std::int8_t(0x20)` to force disp8). The
+    // encoders realize this through the SIB path with the index field set to
+    // "none", so it composes with every memory-capable instruction.
+    template<typename Base, std::integral Disp>
+        requires Register<Base>
+    constexpr auto operator+(Base b, Disp disp) {
+        constexpr e_displacement_type dt = (sizeof(Disp) == 1) ? e_displacement_type::disp8 : e_displacement_type::disp32;
+        return address_expr<Base, no_index_t, 1, dt>{ b, no_index, static_cast<std::int32_t>(disp) };
+    }
+
+    // rax - disp -> address_expr<rax, no_index, 1, disp>
+    template<typename Base, std::integral Disp>
+        requires Register<Base>
+    constexpr auto operator-(Base b, Disp disp) {
+        constexpr e_displacement_type dt = (sizeof(Disp) == 1) ? e_displacement_type::disp8 : e_displacement_type::disp32;
+        return address_expr<Base, no_index_t, 1, dt>{ b, no_index, -static_cast<std::int32_t>(disp) };
+    }
+
     // (rax + rbx*4) + disp -> address_expr with appropriate displacement type
     // Uses disp8 for small displacements (-128 to 127), disp32 otherwise
     template<typename Base, typename Index, int Scale, e_displacement_type DT, std::integral Disp>

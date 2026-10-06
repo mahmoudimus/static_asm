@@ -1780,4 +1780,25 @@ namespace static_asm::x86::instructions {
         return encode<e_instruction_id::rdtscp>();
     }
 
+    // ==========================================================================
+    // LOCK Prefix Wrapper
+    // ==========================================================================
+    //
+    // Prepends the LOCK prefix (0xF0) to a read-modify-write memory instruction,
+    // making it atomic. Wraps an already-encoded instruction, so it composes with
+    // any memory-form ALU/bit instruction:
+    //
+    //     lock_(inc(qword_ptr(rcx + 0x20)))   // F0 48 FF 41 20
+    //     lock_(add(dword_ptr(rax), ecx))     // F0 01 08
+    //     lock_(xchg(qword_ptr(rbx), rax))    // F0 48 87 03
+    //
+    // LOCK is only valid on memory destinations for a fixed instruction set
+    // (ADD, ADC, AND, BTC, BTR, BTS, CMPXCHG, CMPXCHG8B/16B, DEC, INC, NEG, NOT,
+    // OR, SBB, SUB, XOR, XADD, XCHG). This wrapper does not enforce that; it is a
+    // thin byte-level prefix, matching how with_rep_prefix exposes REP.
+    template<std::size_t N>
+    inline constexpr auto lock_(const std::array<std::uint8_t, N>& instr) {
+        return with_lock_prefix(instr);
+    }
+
 } // namespace static_asm::x86::instructions
