@@ -11,6 +11,8 @@ using namespace static_asm::x86::registers;
 #if STATIC_ASM_INVALID_CASE == 0
 constexpr auto valid = mov(qword_ptr(rbx + std::int8_t(0)), 1);
 static_assert(valid.size() == 8);
+constexpr auto valid_constant = mov(qword_ptr(rbx + disp<0>), 1);
+static_assert(valid_constant.size() == 7);
 #elif STATIC_ASM_INVALID_CASE == 1
 constexpr auto invalid = mov(eax, dword_ptr(rip + rcx * s4 + 16));
 #elif STATIC_ASM_INVALID_CASE == 2
@@ -42,6 +44,12 @@ constexpr auto invalid = add(qword_ptr(rbx), 0x100000000ULL);
 constexpr auto invalid = xchg(eax, rax);
 #elif STATIC_ASM_INVALID_CASE == 13
 constexpr auto invalid = xchg(ah, byte_ptr(rbx + r9 * s2));
+#elif STATIC_ASM_INVALID_CASE == 14
+constexpr auto invalid = mov(eax, dword_ptr(rbx + disp<0x80000000LL>));
+#elif STATIC_ASM_INVALID_CASE == 15
+constexpr auto invalid = mov(eax, dword_ptr(rbx - disp<-0x80000000LL>));
+#elif STATIC_ASM_INVALID_CASE == 16
+constexpr auto invalid = mov(eax, dword_ptr(rbx + disp<1> + disp<2>));
 #else
 #error Unknown invalid operand case
 #endif

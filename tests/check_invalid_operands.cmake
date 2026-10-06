@@ -25,7 +25,7 @@ if(NOT no_exceptions_result EQUAL 0)
     message(FATAL_ERROR "Valid operand control failed with exceptions disabled:\n${no_exceptions_stdout}${no_exceptions_stderr}")
 endif()
 
-foreach(case_number RANGE 1 13)
+foreach(case_number RANGE 1 16)
     execute_process(
         COMMAND "${COMPILER}" -std=c++20 -O2 "-I${INCLUDE_DIR}"
             "-DSTATIC_ASM_INVALID_CASE=${case_number}"
@@ -47,6 +47,12 @@ foreach(case_number RANGE 1 13)
         set(expected_diagnostic "lea")
     elseif(case_number EQUAL 12)
         set(expected_diagnostic "XCHG operand widths must match")
+    elseif(case_number EQUAL 14)
+        set(expected_diagnostic "x86 address displacement must fit in signed 32 bits")
+    elseif(case_number EQUAL 15)
+        set(expected_diagnostic "negated x86 address displacement must fit in signed 32 bits")
+    elseif(case_number EQUAL 16)
+        set(expected_diagnostic "only one displacement may be added")
     else()
         set(expected_diagnostic "constant expression")
     endif()

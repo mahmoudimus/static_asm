@@ -283,6 +283,56 @@ TEST(SIBTests, SubToSIB) {
     EXPECT_EQ(result, (internal::make_array<std::uint8_t>(0x29, 0x04, 0x8B)));
 }
 
+TEST(SIBTests, ConstantDisplacementChoosesDisp8) {
+    constexpr auto result = sub(dword_ptr(rsp + disp<0x20>), eax);
+    static_assert(result == internal::make_array<std::uint8_t>(0x29, 0x44, 0x24, 0x20));
+    EXPECT_EQ(result, (internal::make_array<std::uint8_t>(0x29, 0x44, 0x24, 0x20)));
+
+    static_assert(add(rax, qword_ptr(rcx + disp<0x10>)) ==
+        internal::make_array<std::uint8_t>(0x48, 0x03, 0x41, 0x10));
+
+    // A plain int still uses a disp32 because its value is not in the type.
+    static_assert(sub(dword_ptr(rsp + 0x20), eax) ==
+        internal::make_array<std::uint8_t>(0x29, 0x84, 0x24, 0x20, 0x00, 0x00, 0x00));
+}
+
+TEST(SIBTests, ConstantDisplacementWidthBoundaries) {
+    static_assert(mov(eax, dword_ptr(rbx + disp<127>)) ==
+        internal::make_array<std::uint8_t>(0x8B, 0x43, 0x7F));
+    static_assert(mov(eax, dword_ptr(rbx + disp<128>)) ==
+        internal::make_array<std::uint8_t>(0x8B, 0x83, 0x80, 0x00, 0x00, 0x00));
+    static_assert(mov(eax, dword_ptr(rbx + disp<-128>)) ==
+        internal::make_array<std::uint8_t>(0x8B, 0x43, 0x80));
+    static_assert(mov(eax, dword_ptr(rbx + disp<-129>)) ==
+        internal::make_array<std::uint8_t>(0x8B, 0x83, 0x7F, 0xFF, 0xFF, 0xFF));
+    static_assert(mov(eax, dword_ptr(rbx - disp<128>)) ==
+        internal::make_array<std::uint8_t>(0x8B, 0x43, 0x80));
+    static_assert(mov(eax, dword_ptr(rbx - disp<129>)) ==
+        internal::make_array<std::uint8_t>(0x8B, 0x83, 0x7F, 0xFF, 0xFF, 0xFF));
+}
+
+TEST(SIBTests, ConstantZeroDisplacementUsesLegalShortestForm) {
+    static_assert(mov(eax, dword_ptr(rcx + disp<0>)) ==
+        internal::make_array<std::uint8_t>(0x8B, 0x01));
+    static_assert(mov(eax, dword_ptr(rsp + disp<0>)) ==
+        internal::make_array<std::uint8_t>(0x8B, 0x04, 0x24));
+    static_assert(mov(eax, dword_ptr(rbp + disp<0>)) ==
+        internal::make_array<std::uint8_t>(0x8B, 0x45, 0x00));
+    static_assert(mov(eax, dword_ptr(r13 + disp<0>)) ==
+        internal::make_array<std::uint8_t>(0x41, 0x8B, 0x45, 0x00));
+    static_assert(mov(eax, dword_ptr(rip + disp<0>)) ==
+        internal::make_array<std::uint8_t>(0x8B, 0x05, 0x00, 0x00, 0x00, 0x00));
+}
+
+TEST(SIBTests, ConstantIndexedDisplacementChoosesShortestForm) {
+    static_assert(mov(eax, dword_ptr(rbx + rcx * s4 + disp<0>)) ==
+        internal::make_array<std::uint8_t>(0x8B, 0x04, 0x8B));
+    static_assert(mov(eax, dword_ptr(rbx + rcx * s4 + disp<0x10>)) ==
+        internal::make_array<std::uint8_t>(0x8B, 0x44, 0x8B, 0x10));
+    static_assert(mov(eax, dword_ptr(rbx + rcx * s4 + disp<128>)) ==
+        internal::make_array<std::uint8_t>(0x8B, 0x84, 0x8B, 0x80, 0x00, 0x00, 0x00));
+}
+
 // =============================================================================
 // Edge Cases: RBP/R13 as Base (Special Encoding)
 // =============================================================================

@@ -930,6 +930,30 @@ namespace static_asm::x86 {
     inline constexpr scale_t<4> s4{};
     inline constexpr scale_t<8> s8{};
 
+    // Keep a literal displacement in the type so an exact-size instruction
+    // array can use the shortest legal encoding.
+    template<std::int64_t Value>
+    struct displacement_constant {
+        static_assert(Value >= INT32_MIN && Value <= INT32_MAX,
+            "x86 address displacement must fit in signed 32 bits");
+    };
+
+    template<std::int64_t Value>
+    inline constexpr displacement_constant<Value> disp{};
+
+    template<typename Base, std::int64_t Value>
+    consteval e_displacement_type constant_disp_type() {
+        if constexpr (InstructionPointerRegister<Base> || std::same_as<Base, no_base_t>) {
+            return e_displacement_type::disp32;
+        } else if constexpr (Value == 0) {
+            return e_displacement_type::disp0;
+        } else if constexpr (Value >= INT8_MIN && Value <= INT8_MAX) {
+            return e_displacement_type::disp8;
+        } else {
+            return e_displacement_type::disp32;
+        }
+    }
+
     // Define operator* overloads for scale_t
     template<typename Reg, int N>
         requires Register<Reg> && ValidScale<N>
@@ -970,12 +994,28 @@ namespace static_asm::x86 {
         return address_expr<Base, no_index_t, 1, dt>{ b, no_index, static_cast<std::int32_t>(disp) };
     }
 
+    template<typename Base, std::int64_t Value>
+        requires Register<Base>
+    constexpr auto operator+(Base b, displacement_constant<Value>) {
+        constexpr e_displacement_type dt = constant_disp_type<Base, Value>();
+        return address_expr<Base, no_index_t, 1, dt>{ b, no_index, static_cast<std::int32_t>(Value) };
+    }
+
     // rax - disp -> address_expr<rax, no_index, 1, disp>
     template<typename Base, std::integral Disp>
         requires Register<Base>
     constexpr auto operator-(Base b, Disp disp) {
         constexpr e_displacement_type dt = (sizeof(Disp) == 1) ? e_displacement_type::disp8 : e_displacement_type::disp32;
         return address_expr<Base, no_index_t, 1, dt>{ b, no_index, -static_cast<std::int32_t>(disp) };
+    }
+
+    template<typename Base, std::int64_t Value>
+        requires Register<Base>
+    constexpr auto operator-(Base b, displacement_constant<Value>) {
+        static_assert(-Value >= INT32_MIN && -Value <= INT32_MAX,
+            "negated x86 address displacement must fit in signed 32 bits");
+        constexpr e_displacement_type dt = constant_disp_type<Base, -Value>();
+        return address_expr<Base, no_index_t, 1, dt>{ b, no_index, static_cast<std::int32_t>(-Value) };
     }
 
     // (rax + rbx*4) + disp -> address_expr with appropriate displacement type
@@ -996,6 +1036,15 @@ namespace static_asm::x86 {
                 addr.base, addr.index, disp32
             };
         }
+    }
+
+    template<typename Base, typename Index, int Scale, e_displacement_type DT, std::int64_t Value>
+        requires(std::same_as<Base, no_base_t> || Register<Base>) && (std::same_as<Index, no_index_t> || Register<Index>)
+    constexpr auto operator+(address_expr<Base, Index, Scale, DT> addr, displacement_constant<Value>) {
+        static_assert(DT == e_displacement_type::disp0,
+            "only one displacement may be added to an address expression");
+        constexpr e_displacement_type dt = constant_disp_type<Base, Value>();
+        return address_expr<Base, Index, Scale, dt>{ addr.base, addr.index, static_cast<std::int32_t>(Value) };
     }
 
     // =========================================================================

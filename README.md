@@ -18,6 +18,8 @@ This project is dual-licensed under the [Boost Software License 1.0](https://www
 ```cpp
 #include "static_asm.hpp"
 
+using namespace static_asm;
+using namespace static_asm::x86;
 using namespace static_asm::x86::registers;
 using namespace static_asm::x86::instructions;
 
@@ -53,17 +55,19 @@ and_(rdx, 0xFF);         // 48 83 E2 FF
 
 // With memory operands
 add(eax, dword_ptr(rbx));                        // 03 03
-add(rax, qword_ptr(rcx + std::int8_t(0x10)));    // 48 03 41 10
-sub(dword_ptr(rsp + std::int8_t(0x20)), eax);    // 29 44 24 20
+add(rax, qword_ptr(rcx + disp<0x10>));           // 48 03 41 10
+sub(dword_ptr(rsp + disp<0x20>), eax);           // 29 44 24 20
 ```
 
-> **Displacement width is chosen by the operand type, not its value.** An 8-bit
-> integer (`std::int8_t(0x10)`) selects a `disp8`; any wider integer (a bare
-> `0x10`, which is `int`) selects a `disp32`. So `qword_ptr(rcx + 0x10)` encodes
-> a 4-byte displacement, while `qword_ptr(rcx + std::int8_t(0x10))` encodes a
-> 1-byte one. `[base + disp]` with a general base uses the canonical ModR/M-only
-> form (no SIB byte); RSP/R12 bases emit a SIB byte because the hardware
-> requires it.
+> **Use `disp<value>` for the shortest displacement.** It chooses no displacement
+> for zero where legal, a signed `disp8` for -128 through 127, and `disp32`
+> otherwise. RIP-relative addresses always need a `disp32`; RBP/R13 with zero
+> still need a zero `disp8`. Values outside signed 32 bits fail compilation.
+> A plain integer such as `rcx + 0x10` still uses `disp32`: C++ cannot select
+> different exact-size instruction array types from the value of an `int`
+> argument. An explicit `std::int8_t(0x10)` also selects `disp8`.
+> `[base + disp]` with a general base uses the canonical ModR/M-only form (no
+> SIB byte); RSP/R12 bases emit a SIB byte because the hardware requires it.
 
 ### Data Movement
 
