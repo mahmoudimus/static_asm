@@ -167,3 +167,35 @@ TEST(AsmBlock, DataDirectives) {
     EXPECT_EQ(code, (internal::make_array<std::uint8_t>(
                         0xAB, 0x34, 0x12, 0xEF, 0xBE, 0xAD, 0xDE)));
 }
+
+// put_rip with a trailing immediate (disp32 before the imm, both patched/kept).
+TEST(AsmBlock, RipLabelWithImmediate) {
+    constexpr auto code = build([](asm_block<>& b) {
+        auto data = b.label();
+        b.put_rip(mov(dword_ptr(rip + 0), 0x7B), data, 4); // mov dword [rip+data],0x7B
+        b.put(ret());
+        b.bind(data);
+        b.dd(0);
+    });
+    EXPECT_EQ(code, (internal::make_array<std::uint8_t>(
+                        0xC7, 0x05, 0x01, 0x00, 0x00, 0x00, 0x7B, 0x00, 0x00, 0x00,
+                        0xC3, 0x00, 0x00, 0x00, 0x00)));
+}
+
+// Typed RIP-relative label helpers: lea / mov load / mov store.
+TEST(AsmBlock, TypedLabelHelpers) {
+    constexpr auto code = build([](asm_block<>& b) {
+        auto data = b.label();
+        b.lea(rax, data); // 48 8D 05 <disp=0x0E>
+        b.mov(ecx, data); // 8B 0D <disp=0x08>
+        b.mov(data, rbx); // 48 89 1D <disp=0x01>
+        b.put(ret());
+        b.bind(data);
+        b.dq(0);
+    });
+    EXPECT_EQ(code, (internal::make_array<std::uint8_t>(
+                        0x48, 0x8D, 0x05, 0x0E, 0x00, 0x00, 0x00,
+                        0x8B, 0x0D, 0x08, 0x00, 0x00, 0x00,
+                        0x48, 0x89, 0x1D, 0x01, 0x00, 0x00, 0x00,
+                        0xC3, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)));
+}

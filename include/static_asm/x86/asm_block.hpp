@@ -31,6 +31,11 @@
 #include <cstddef>
 #include <cstdint>
 
+// The typed label helpers (lea/mov to a label) build real instructions, so pull
+// in the operand types, registers and instruction functions.
+#include "gen/instruction.g.hpp"
+#include "operands.hpp"
+
 namespace static_asm::x86 {
 
     // A compile-time assembler block with a fixed capacity (no heap, so the
@@ -63,22 +68,25 @@ namespace static_asm::x86 {
         }
 
         // Append a RIP-relative instruction and resolve its disp32 to `target`.
-        // The instruction must be built with a `rip + 0` placeholder operand and
-        // must end in its disp32 (i.e. no trailing immediate) - the last four
-        // bytes are patched to make the operand point at `target`. Example:
+        // The instruction must be built with a `rip + 0` placeholder operand.
+        // `imm_tail` is the number of immediate bytes that follow the disp32
+        // (0 for loads/stores/lea; 4 for e.g. mov [rip], imm32). The disp32 then
+        // sits at offset N - 4 - imm_tail and is patched to point at `target`.
         //     auto data = b.label();
-        //     b.put_rip(lea(rax, qword_ptr(rip + 0)), data);  // lea rax,[rip+data]
+        //     b.put_rip(lea(rax, qword_ptr(rip + 0)), data);          // imm_tail 0
+        //     b.put_rip(mov(dword_ptr(rip + 0), 0x7B), data, 4);      // imm32 tail
         //     ...
         //     b.bind(data);
         //     b.dq(0xCAFEBABE);
         template<std::size_t N>
-        constexpr void put_rip(const std::array<std::uint8_t, N>& instr, label_id target) {
+        constexpr void put_rip(const std::array<std::uint8_t, N>& instr, label_id target, std::size_t imm_tail = 0) {
             static_assert(N >= 5, "a RIP-relative instruction is at least 5 bytes");
             auto off = static_cast<std::uint16_t>(pool_count_);
             for (std::size_t i = 0; i < N; ++i) {
                 pool_[pool_count_++] = instr[i];
             }
-            frags_[frag_count_++] = frag{ frag_kind::rip_bytes, off, static_cast<std::uint16_t>(N), 0, false, 0, target };
+            // imm_tail is stored in the (otherwise unused) rel8_op slot.
+            frags_[frag_count_++] = frag{ frag_kind::rip_bytes, off, static_cast<std::uint16_t>(N), static_cast<std::uint8_t>(imm_tail), false, 0, target };
         }
 
         // Data directives: emit raw little-endian data. Bind a label before one
@@ -98,6 +106,27 @@ namespace static_asm::x86 {
                 static_cast<std::uint8_t>(v >> 16), static_cast<std::uint8_t>(v >> 24),
                 static_cast<std::uint8_t>(v >> 32), static_cast<std::uint8_t>(v >> 40),
                 static_cast<std::uint8_t>(v >> 48), static_cast<std::uint8_t>(v >> 56) });
+        }
+
+        // Typed RIP-relative label helpers (sugar over put_rip): load/store a
+        // register from/to a labelled location, or take its address.
+        //     b.lea(rax, data);   // lea  rax, [rip+data]
+        //     b.mov(rax, data);   // mov  rax, [rip+data]   (load)
+        //     b.mov(data, rax);   // mov  [rip+data], rax   (store)
+        template<typename Reg>
+            requires Register<Reg>
+        constexpr void lea(const Reg& reg, label_id target) {
+            put_rip(instructions::lea(reg, qword_ptr(registers::rip + 0)), target);
+        }
+        template<typename Reg>
+            requires Register<Reg>
+        constexpr void mov(const Reg& reg, label_id target) { // load
+            put_rip(instructions::mov(reg, rip_mem0<Reg>()), target);
+        }
+        template<typename Reg>
+            requires Register<Reg>
+        constexpr void mov(label_id target, const Reg& reg) { // store
+            put_rip(instructions::mov(rip_mem0<Reg>(), reg), target);
         }
 
         // Branches to a (possibly forward) label. Width is chosen by relaxation.
@@ -189,9 +218,10 @@ namespace static_asm::x86 {
                     for (std::uint16_t k = 0; k < f.len; ++k) {
                         out[pos++] = pool_[f.off + k];
                     }
-                    // RIP displacement is relative to the end of the instruction.
+                    // RIP displacement is relative to the end of the whole
+                    // instruction (including any trailing immediate).
                     std::int32_t disp = static_cast<std::int32_t>(st.label_off[f.target]) - static_cast<std::int32_t>(start + f.len);
-                    std::size_t d = start + f.len - 4; // disp32 occupies the last 4 bytes
+                    std::size_t d = start + f.len - 4 - f.rel8_op; // disp32 sits before the imm tail
                     out[d + 0] = static_cast<std::uint8_t>(disp & 0xFF);
                     out[d + 1] = static_cast<std::uint8_t>((disp >> 8) & 0xFF);
                     out[d + 2] = static_cast<std::uint8_t>((disp >> 16) & 0xFF);
@@ -238,6 +268,20 @@ namespace static_asm::x86 {
             std::array<bool, MaxFrag> is_long{}; // per-branch width choice
             std::array<std::size_t, MaxLabel> label_off{};
         };
+
+        // A [rip + 0] memory operand sized to match Reg (for load/store).
+        template<typename Reg>
+        static constexpr auto rip_mem0() {
+            if constexpr (Reg::size == 8) {
+                return byte_ptr(registers::rip + 0);
+            } else if constexpr (Reg::size == 16) {
+                return word_ptr(registers::rip + 0);
+            } else if constexpr (Reg::size == 32) {
+                return dword_ptr(registers::rip + 0);
+            } else {
+                return qword_ptr(registers::rip + 0);
+            }
+        }
 
         constexpr void cc(std::uint8_t code, label_id l) {
             // jcc: short 0x70+cc (1 byte), near 0x0F 0x80+cc (2 bytes)
