@@ -114,7 +114,7 @@ namespace static_asm::x86 {
         //     b.mov(rax, data);   // mov  rax, [rip+data]   (load)
         //     b.mov(data, rax);   // mov  [rip+data], rax   (store)
         template<typename Reg>
-            requires Register<Reg>
+            requires Register<Reg> && (Reg::size == 16 || Reg::size == 32 || Reg::size == 64)
         constexpr void lea(const Reg& reg, label_id target) {
             put_rip(instructions::lea(reg, qword_ptr(registers::rip + 0)), target);
         }

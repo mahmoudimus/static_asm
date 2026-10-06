@@ -15,7 +15,7 @@ namespace static_asm::x86 {
     template<typename Mem, typename Reg>
         requires Memory<Mem> && Register<typename Mem::value_type> && Register<Reg>
     inline constexpr std::uint8_t encode_rex() {
-        return encode_rex<typename Mem::value_type, Reg>();
+        return (0b0100 << 4) + ((Reg::size >= 64) << 3) + ((Reg::extended ? 1 : 0) << 2) + (Mem::value_type::extended ? 1 : 0);
     }
 
     template<typename Reg, typename Mem>
@@ -43,11 +43,17 @@ namespace static_asm::x86 {
     template<typename Mem>
         requires Memory<Mem>
     inline constexpr std::uint8_t encode_rex() {
+        constexpr bool rex_b = []() {
+            if constexpr (Register<typename Mem::value_type>) {
+                return Mem::value_type::extended;
+            }
+            return false;
+        }();
         return (0b0100 << 4) // fixed value
                + ((Mem::size >= 64) << 3) // Rex.W
                + (0 << 2) // Rex.R
                + (0 << 1) // Rex.X
-               + (0); // Rex.B
+               + (rex_b ? 1 : 0); // Rex.B
     }
 
     template<typename Imm>
@@ -109,7 +115,7 @@ namespace static_asm::x86 {
     template<typename Mem>
         requires Memory<Mem> && Register<typename Mem::value_type>
     inline constexpr bool needs_rex() {
-        return Mem::size >= 64;
+        return Mem::size >= 64 || Mem::value_type::extended;
     }
 
     template<typename Imm>
@@ -121,6 +127,9 @@ namespace static_asm::x86 {
     template<typename Mem, typename Reg>
         requires Memory<Mem> && Register<Reg>
     inline constexpr bool needs_rex() {
+        if constexpr (Register<typename Mem::value_type>) {
+            return Reg::extended || Reg::size >= 64 || Mem::value_type::extended;
+        }
         return Reg::extended || Reg::size >= 64;
     }
 

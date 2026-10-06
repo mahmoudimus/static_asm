@@ -105,6 +105,13 @@ mov(qword_ptr(rcx + std::int8_t(0x10)), 1);      // 48 C7 41 10 01 00 00 00
 add(qword_ptr(rbx + std::int8_t(0x8)), 0x10);    // 48 81 43 08 10 00 00 00
 ```
 
+A qword memory destination has only a sign-extended 32-bit immediate encoding.
+An integer's 64-bit bit pattern must match that encoding: for example, `0x7FFFFFFF`
+and `-0x80000000LL` fit, while positive `0x80000000ULL` does not. An invalid
+value fails constant evaluation or throws `std::out_of_range` at runtime.
+With exceptions disabled, an invalid runtime value terminates. Explicit
+`imm32` operands supply the raw four immediate bytes.
+
 ### RIP-Relative Addressing
 
 `rip + disp` (and `rip - disp`) encode the 64-bit RIP-relative form (ModR/M
@@ -567,9 +574,12 @@ byte arrays, but cannot place x86 bytes in their instruction stream.
 
 Known gaps:
 
-- **`asm_block` typed helpers beyond `lea`/`mov`.** Labels can be referenced
-  from any instruction via `put_rip`; named sugar currently exists for `lea`
-  and `mov` (load/store). Other mnemonics use `put_rip` directly.
+- **`asm_block` typed helpers beyond `lea`/`mov`.** `put_rip` patches an already
+  encoded RIP-relative instruction; it does not add missing encoder forms.
+  Current RIP-relative memory support covers MOV, LEA, XCHG, ALU, unary
+  INC/DEC/NEG/NOT, and MUL/IMUL/DIV/IDIV. For example, `test(rax,
+  qword_ptr(rip + 0))` is not yet supported. Named label helpers currently
+  exist for `lea` and `mov` (load/store); other supported forms use `put_rip`.
 - **No SIMD/AVX/VEX/EVEX**, x87, or segment-override prefixes.
 
 ## Developing

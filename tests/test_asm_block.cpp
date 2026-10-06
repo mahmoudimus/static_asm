@@ -200,10 +200,9 @@ TEST(AsmBlock, TypedLabelHelpers) {
                         0xC3, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)));
 }
 
-// put_rip reaches every memory-capable mnemonic, not just lea/mov: a medley of
-// instruction families all RIP-reference the same data label. Each instruction
-// must resolve to the data qword that follows the ret. Verified vs ndisasm.
-TEST(AsmBlock, RipLabelAnyMnemonic) {
+// Representative supported memory forms RIP-reference the same data label.
+// Each must resolve to the data qword after the ret. Verified vs ndisasm.
+TEST(AsmBlock, RipLabelSupportedFamilies) {
     constexpr auto code = build([](asm_block<>& b) {
         auto data = b.label();
         b.put_rip(add(rax, qword_ptr(rip + 0)), data);

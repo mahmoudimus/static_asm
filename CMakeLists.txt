@@ -165,6 +165,17 @@ if(STATIC_ASM_BUILD_TESTS)
     )
 
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT USING_CLANG_CL)
+        add_test(NAME Operand.InvalidRejected
+            COMMAND ${CMAKE_COMMAND}
+                "-DCOMPILER=${CMAKE_CXX_COMPILER}"
+                "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/tests/test_invalid_operands.cpp"
+                "-DINCLUDE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/include"
+                "-DOUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_invalid_operands.cmake"
+        )
+    endif()
+
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT USING_CLANG_CL)
         if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64|i[3-6]86)$")
             add_executable(static_asm_emit_smoke tests/test_emit_smoke.cpp)
             target_link_libraries(static_asm_emit_smoke PRIVATE static_asm)

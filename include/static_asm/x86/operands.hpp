@@ -384,6 +384,13 @@ namespace static_asm::x86 {
     template<typename T>
     concept LRegister8 = _Register8bitOperand<T>;
 
+    template<typename T>
+    concept HighByteRegister = LRegister8<T> &&
+                               (T::id_value == e_register8bit_id::ah ||
+                                   T::id_value == e_register8bit_id::ch ||
+                                   T::id_value == e_register8bit_id::dh ||
+                                   T::id_value == e_register8bit_id::bh);
+
     // Size-specific extended register concepts
     template<typename T>
     concept ERegister64 = ExtendedRegister<T, 64>;
@@ -844,6 +851,11 @@ namespace static_asm::x86 {
     inline constexpr no_base_t no_base{};
     inline constexpr no_index_t no_index{};
 
+    template<typename T>
+    concept InstructionPointerRegister = Register<T> && requires {
+        { T::is_ip() } -> std::convertible_to<bool>;
+    } && T::is_ip();
+
     // Represents a full SIB address: base + index*scale + displacement
     template<typename Base, typename Index, int Scale, e_displacement_type DispType = e_displacement_type::disp0>
         requires(Register<Base> || std::same_as<Base, no_base_t>) && (Register<Index> || std::same_as<Index, no_index_t>) && ValidScale<Scale>
@@ -856,6 +868,8 @@ namespace static_asm::x86 {
         static constexpr e_displacement_type disp_type = DispType;
         static constexpr bool has_base = !std::same_as<Base, no_base_t>;
         static constexpr bool has_index = !std::same_as<Index, no_index_t>;
+        static_assert(!(InstructionPointerRegister<Base> && has_index),
+            "RIP-relative addressing cannot use an index register");
 
         constexpr address_expr(Base b, Index i, std::int32_t disp = 0)
             : base(b), index(i), displacement(disp) {}
