@@ -52,10 +52,18 @@ sub(ecx, 100);           // 83 E9 64
 and_(rdx, 0xFF);         // 48 83 E2 FF
 
 // With memory operands
-add(eax, dword_ptr(rbx));              // 03 03
-add(rax, qword_ptr(rcx + 0x10));       // 48 03 41 10
-sub(dword_ptr(rsp + 0x20), eax);       // 29 44 24 20
+add(eax, dword_ptr(rbx));                        // 03 03
+add(rax, qword_ptr(rcx + std::int8_t(0x10)));    // 48 03 41 10
+sub(dword_ptr(rsp + std::int8_t(0x20)), eax);    // 29 44 24 20
 ```
+
+> **Displacement width is chosen by the operand type, not its value.** An 8-bit
+> integer (`std::int8_t(0x10)`) selects a `disp8`; any wider integer (a bare
+> `0x10`, which is `int`) selects a `disp32`. So `qword_ptr(rcx + 0x10)` encodes
+> a 4-byte displacement, while `qword_ptr(rcx + std::int8_t(0x10))` encodes a
+> 1-byte one. `[base + disp]` with a general base uses the canonical ModR/M-only
+> form (no SIB byte); RSP/R12 bases emit a SIB byte because the hardware
+> requires it.
 
 ### Data Movement
 
@@ -70,10 +78,10 @@ mov(rax, 0x12345678);    // 48 C7 C0 78 56 34 12
 mov(eax, 0xDEADBEEF);    // B8 EF BE AD DE
 
 // Memory operations
-mov(rax, qword_ptr(rbx));              // 48 8B 03
-mov(eax, dword_ptr(rcx + 0x10));       // 8B 41 10
-mov(qword_ptr(rsp + 0x8), rax);        // 48 89 44 24 08
-mov(dword_ptr(rbp - 0x20), 0x100);     // C7 45 E0 00 01 00 00
+mov(rax, qword_ptr(rbx));                        // 48 8B 03
+mov(eax, dword_ptr(rcx + std::int8_t(0x10)));    // 8B 41 10
+mov(rax, qword_ptr(rbp - std::int8_t(0x20)));    // 48 8B 45 E0 (canonical, no SIB)
+mov(qword_ptr(rsp + std::int8_t(0x8)), rax);     // 48 89 44 24 08 (RSP base needs SIB)
 
 // Zero/sign extension
 movzx(eax, bl);          // 0F B6 C3 (zero-extend byte to dword)
@@ -83,8 +91,8 @@ movsx(rax, dx);          // 48 0F BF C2 (sign-extend word to qword)
 movsxd(rax, ecx);        // 48 63 C1 (sign-extend dword to qword)
 
 // Load effective address
-lea(rax, qword_ptr(rbx + rcx * s4));           // 48 8D 04 8B
-lea(rax, qword_ptr(rbx + rcx * s8 + 0x10));    // 48 8D 44 CB 10
+lea(rax, qword_ptr(rbx + rcx * s4));                      // 48 8D 04 8B
+lea(rax, qword_ptr(rbx + rcx * s8 + std::int8_t(0x10)));  // 48 8D 44 CB 10
 
 // Exchange
 xchg(rax, rbx);          // 48 87 D8
@@ -100,16 +108,16 @@ mov(eax, dword_ptr(rbx + rcx * s4));   // 8B 04 8B
 mov(eax, dword_ptr(rbx + rcx * s8));   // 8B 04 CB
 
 // [base + index*scale + displacement]
-mov(rax, qword_ptr(rbx + rcx * s4 + 0x10));     // 48 8B 44 8B 10
-mov(rax, qword_ptr(r12 + r13 * s8 + 0x1000));   // 4B 8B 84 EC 00 10 00 00
+mov(rax, qword_ptr(rbx + rcx * s4 + std::int8_t(0x10)));  // 48 8B 44 8B 10
+mov(rax, qword_ptr(r12 + r13 * s8 + 0x1000));             // 4B 8B 84 EC 00 10 00 00
 
 // Store to SIB address
-mov(dword_ptr(rax + rdx * s4), ecx);            // 89 0C 90
-mov(qword_ptr(rbx + rsi * s8 + 0x20), rax);     // 48 89 44 F3 20
+mov(dword_ptr(rax + rdx * s4), ecx);                      // 89 0C 90
+mov(qword_ptr(rbx + rsi * s8 + std::int8_t(0x20)), rax);  // 48 89 44 F3 20
 
 // LEA with SIB (useful for address calculations)
-lea(rax, qword_ptr(rbx + rcx * s4));            // 48 8D 04 8B
-lea(rax, qword_ptr(rdi + rsi * s8 + 0x100));    // 48 8D 84 F7 00 01 00 00
+lea(rax, qword_ptr(rbx + rcx * s4));                      // 48 8D 04 8B
+lea(rax, qword_ptr(rdi + rsi * s8 + 0x100));              // 48 8D 84 F7 00 01 00 00
 ```
 
 ### Shift and Rotate
@@ -152,7 +160,43 @@ imul(ecx, edx);          // 0F AF CA
 // Three-operand IMUL (dest = src * imm)
 imul(rax, rbx, 10);      // 48 6B C3 0A
 imul(ecx, edx, 1000);    // 69 CA E8 03 00 00
+
+// Single-operand form with a memory operand
+mul(qword_ptr(rcx));                             // 48 F7 21
+imul(qword_ptr(rcx + std::int8_t(0x20)));        // 48 F7 69 20
+div(dword_ptr(rax + std::int8_t(0x10)));         // F7 70 10
+idiv(qword_ptr(rbx));                            // 48 F7 3B
 ```
+
+### Increment / Decrement / Negate / Not
+
+```cpp
+// Register operands
+inc(rax);                // 48 FF C0
+dec(ecx);                // FF C9
+neg(rbx);                // 48 F7 DB
+not_(rdx);               // 48 F7 D2
+
+// Memory operands (canonical ModR/M-only addressing)
+inc(qword_ptr(rcx));                             // 48 FF 01
+inc(qword_ptr(rcx + std::int8_t(0x20)));         // 48 FF 41 20
+dec(dword_ptr(rax + std::int8_t(0x10)));         // FF 48 10
+neg(qword_ptr(rbx));                             // 48 F7 1B
+not_(qword_ptr(rbx - std::int8_t(0x4)));         // 48 F7 53 FC
+```
+
+### LOCK Prefix
+
+`lock_` prepends the `LOCK` prefix (`0xF0`) to any encoded instruction, making a
+read-modify-write on memory atomic:
+
+```cpp
+lock_(inc(qword_ptr(rcx + std::int8_t(0x20))));  // F0 48 FF 41 20
+lock_(add(dword_ptr(rax), ecx));                 // F0 01 08
+```
+
+It is a thin byte-level wrapper and does not validate that the wrapped
+instruction is one the CPU permits `LOCK` on.
 
 ### Control Flow
 
@@ -181,6 +225,46 @@ call(0x100);             // E8 00 01 00 00 (relative call)
 ret();                   // C3
 ret(0x10);               // C2 10 00 (return and pop 16 bytes)
 ```
+
+### Labels and Branch Relaxation (`asm_block`)
+
+The jump helpers above take a literal displacement you compute yourself.
+`asm_block` adds a compile-time assembler layer that resolves branches to
+**labels** and picks the smallest encoding (rel8 when the target is within
++/-127, rel32 otherwise) via iterative relaxation — so the output matches
+hand-written/standard-assembler bytes.
+
+```cpp
+using namespace static_asm::x86;
+
+constexpr auto code = build([](asm_block<>& b) {
+    auto loop = b.label();
+    b.bind(loop);
+    b.put(dec(ecx));     // any encoded instruction array
+    b.jne(loop);         // -> 75 FC : rel8 displacement computed for you
+});
+// code == { FF, C9, 75, FC }
+```
+
+`build()` computes the final size from the block itself, so the array length is
+never written by hand. Labels also expose their final byte offset via
+`offset_of()`, which gives exact runtime patch sites:
+
+```cpp
+constexpr std::size_t imm_slot = [] {
+    asm_block<> b;
+    auto ctx = b.label();
+    b.put(nop());            // leading code
+    b.bind(ctx);
+    b.put(movabs(rax, 0));   // 48 B8 + imm64 placeholder
+    return b.offset_of(ctx) + 2;   // skip 48 B8 -> imm64 starts here
+}();   // imm_slot == 3
+```
+
+Labels are handles (`b.label()` / `b.bind()` / `b.jne(label)`), not strings.
+`call` to a label is always rel32 (it has no short form). The block has a fixed
+capacity for heap-free `constexpr` use: `asm_block<BytePool, MaxFrag, MaxLabel>`,
+with generous defaults — raise them for larger programs.
 
 ### Conditional Moves
 
@@ -410,15 +494,35 @@ Note: The `core::emit()` inline assembly feature requires Clang with -O2 optimiz
 | String Operations | MOVSB/W/D/Q, CMPSB/W/D/Q, LODSB/W/D/Q, STOSB/W/D/Q, SCASB/W/D/Q (with REP/REPE/REPNE prefixes) |
 | System | SYSCALL, SYSENTER, SYSEXIT, INT, INT3, IRET/D/Q, CLI, STI, HLT, CPUID, RDTSC, RDTSCP |
 | Misc | NOP, UD2 |
+| Prefixes | LOCK (`lock_`), REP/REPE/REPNE (string ops) |
+| Assembler layer | `asm_block` + `build()`: labels, branch relaxation (rel8/rel32), patch offsets |
 
 **Operand support:**
 - All 8/16/32/64-bit general purpose registers (AL-R15)
 - Extended registers (R8-R15, R8D-R15D, R8W-R15W, R8B-R15B)
 - Immediate values (8/16/32/64-bit)
-- Memory operands with base register and displacement
+- Memory operands: `[reg]`, `[reg +/- disp]` (canonical ModR/M-only), `[disp32]` (absolute)
 - SIB addressing: `[base + index*scale + disp]` with scale factors 1, 2, 4, 8
+- Memory destinations for the unary (INC/DEC/NEG/NOT) and MUL/IMUL/DIV/IDIV groups
 
 **Note**: No SIMD/AVX extensions yet.
+
+## Roadmap / What's Left
+
+Known gaps, roughly in priority order:
+
+- **Memory destination + immediate for base/indexed addressing.** `mov`/`add`/...
+  with an immediate into a displaced or SIB memory operand
+  (`mov(dword_ptr(rbp - std::int8_t(0x20)), 0x100)`) is not yet encodable. Only
+  register-indirect (`[reg]`) and absolute (`[disp32]`) memory destinations
+  accept an immediate today.
+- **`xchg` with a memory operand.** `xchg` is currently register-only.
+- **Label-aware `asm_block` coverage.** `asm_block` wraps raw instruction arrays
+  plus `jmp`/`jcc`/`call` to labels; it does not yet offer typed helpers for
+  every instruction, RIP-relative label references, or data/`.byte` directives
+  between labels.
+- **RIP-relative addressing** (`[rip + disp32]`) as an operand form.
+- **No SIMD/AVX/VEX/EVEX**, x87, or segment-override prefixes.
 
 ## Developing
 
