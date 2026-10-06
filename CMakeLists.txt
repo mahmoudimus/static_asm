@@ -63,6 +63,7 @@ elseif(MSVC OR USING_CLANG_CL)
     target_compile_options(static_asm INTERFACE
         /W4 /permissive- /Zc:__cplusplus /bigobj
         /Gy  # Enable function-level linking to handle duplicate COMDATs
+        /Zc:inline  # Drop/dedupe COMDATs for inline template fns (avoids LNK1179 under /O2)
         /wd4068  # Disable unknown pragma warning (we use #pragma clang diagnostic)
         /wd4244  # Disable conversion warning (intentional truncation of immediates)
     )
@@ -148,9 +149,12 @@ if(STATIC_ASM_BUILD_TESTS)
         # Disable C4244 (conversion) - intentional truncation of immediates to register size
         target_compile_options(static_asm_tests PRIVATE /wd4068 /wd4244)
         target_compile_options(static_asm_tests PRIVATE $<$<CONFIG:Release>:/O2>)
-        # Enable inline expansion in Debug mode to avoid duplicate COMDAT errors
-        # from header-only template library (inline constexpr functions)
+        # Constrain inline expansion to /Ob1 to avoid duplicate COMDAT errors
+        # (LNK1179) from the header-only template library (inline constexpr
+        # functions). Debug default is /Ob0; Release /O2 implies /Ob2. The /Ob1
+        # here is listed after /O2 so it wins, matching the Debug workaround.
         target_compile_options(static_asm_tests PRIVATE $<$<CONFIG:Debug>:/Ob1>)
+        target_compile_options(static_asm_tests PRIVATE $<$<CONFIG:Release>:/Ob1>)
     endif()
 
     include(GoogleTest)
