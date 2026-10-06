@@ -169,7 +169,7 @@ namespace static_asm::x86 {
 
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires(Register<Op1> || Memory<Op1>) && (Register<Op2> || Memory<Op2> || Immediate<Op2>)
-    inline constexpr auto encode_alu([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
+    inline constexpr auto encode_alu([[maybe_unused]] instruction_desc desc, [[maybe_unused]] Op1 op1, [[maybe_unused]] Op2 op2) {
         auto id = desc.id();
         auto opcode = desc.primary_opcode();
 
@@ -257,7 +257,7 @@ namespace static_asm::x86 {
 
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires(Register<Op1> || Memory<Op1>) && (Register<Op2> || Memory<Op2> || Immediate<Op2>)
-    inline constexpr auto encode_bt([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
+    inline constexpr auto encode_bt([[maybe_unused]] instruction_desc desc, [[maybe_unused]] Op1 op1, [[maybe_unused]] Op2 op2) {
         auto id = desc.id();
         auto opcode = desc.primary_opcode();
 
@@ -436,7 +436,7 @@ namespace static_asm::x86 {
     // memory-immediate, and 64-bit register-immediate (uses C6/C7 ModR/M form)
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires((Register<Op1> || Memory<Op1>) && (Register<Op2> || Memory<Op2> || Immediate<Op2>) && !(Register<Op1> && Immediate<Op2> && (Op1::size <= 32)))
-    inline constexpr auto encode_mov([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
+    inline constexpr auto encode_mov([[maybe_unused]] instruction_desc desc, [[maybe_unused]] Op1 op1, [[maybe_unused]] Op2 op2) {
         auto opcode = desc.primary_opcode();
 
         if constexpr (Immediate<Op2>) {
@@ -465,108 +465,90 @@ namespace static_asm::x86 {
     }
 
     // =========================================================================
+    // Shared memory-operand tail: ModR/M [+ SIB] [+ displacement]
+    // =========================================================================
+    //
+    // Emits the canonical addressing tail for a SIB-capable memory operand,
+    // choosing the ModR/M-only form when the hardware permits it and only
+    // emitting a SIB byte when an index register, an RSP/R12 base, or a
+    // base-less (disp32-only) operand requires one. `reg_bits` is the ModR/M
+    // reg field: a register's low 3 bits for a reg<->mem instruction, or an
+    // opcode-group extension for the unary / mul-div groups.
+    template<typename SIBMem>
+        requires SIBMemory<SIBMem>
+    inline constexpr std::size_t mem_tail_size() {
+        return 1u /* modrm */ + (mem_uses_sib<SIBMem>() ? 1u : 0u) + mem_disp_size<SIBMem>();
+    }
+
+    template<typename SIBMem>
+        requires SIBMemory<SIBMem>
+    inline constexpr void write_mem_tail(std::uint8_t reg_bits, const SIBMem& mem, std::uint8_t* out, std::size_t& i) {
+        out[i++] = encode_modrm_mem<SIBMem>(reg_bits);
+        if constexpr (mem_uses_sib<SIBMem>()) {
+            out[i++] = encode_sib(mem);
+        }
+        constexpr std::size_t ds = mem_disp_size<SIBMem>();
+        if constexpr (ds == 1) {
+            out[i++] = static_cast<std::uint8_t>(mem.displacement());
+        } else if constexpr (ds == 4) {
+            auto disp = mem.displacement();
+            out[i++] = static_cast<std::uint8_t>(disp);
+            out[i++] = static_cast<std::uint8_t>(disp >> 8);
+            out[i++] = static_cast<std::uint8_t>(disp >> 16);
+            out[i++] = static_cast<std::uint8_t>(disp >> 24);
+        }
+    }
+
+    // =========================================================================
     // SIB Encoding for MOV: mov reg, [base + index*scale + disp]
     // =========================================================================
 
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Register<Op1> && SIBMemory<Op2>
-    inline constexpr auto encode_mov_sib([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
+    inline constexpr auto encode_mov_sib([[maybe_unused]] instruction_desc desc, [[maybe_unused]] Op1 op1, [[maybe_unused]] Op2 op2) {
         // Opcode for mov reg, r/m (8B for 32/64-bit, 8A for 8-bit)
         std::uint8_t opcode = Op1::size == 8 ? 0x8A : 0x8B;
-
-        auto modrm = encode_modrm_sib(op1, op2);
-        auto sib = encode_sib(op2);
 
         constexpr bool need_rex = needs_rex_sib<Op1, typename Op2::base_type, typename Op2::index_type>();
         constexpr bool need_16bit_prefix = Op1::size == 16;
 
-        // Determine displacement size at compile time based on displacement type
-        constexpr std::size_t disp_size = []() {
-            if constexpr (Op2::disp_type == e_displacement_type::disp8) {
-                return 1;
-            } else if constexpr (Op2::disp_type == e_displacement_type::disp32) {
-                return 4;
-            }
-            return 0;
-        }();
-
-        constexpr std::size_t total_size = need_16bit_prefix + need_rex + 1 + 1 + 1 + disp_size;
+        constexpr std::size_t total_size = need_16bit_prefix + need_rex + 1 + mem_tail_size<Op2>();
         std::array<std::uint8_t, total_size> result{};
         std::size_t i = 0;
 
         if constexpr (need_16bit_prefix) {
             result[i++] = 0x66;
         }
-
         if constexpr (need_rex) {
             result[i++] = encode_rex_sib<Op1, typename Op2::base_type, typename Op2::index_type>();
         }
-
         result[i++] = opcode;
-        result[i++] = modrm;
-        result[i++] = sib;
-
-        if constexpr (disp_size == 1) {
-            result[i++] = static_cast<std::uint8_t>(op2.displacement());
-        } else if constexpr (disp_size == 4) {
-            auto disp = op2.displacement();
-            result[i++] = static_cast<std::uint8_t>(disp);
-            result[i++] = static_cast<std::uint8_t>(disp >> 8);
-            result[i++] = static_cast<std::uint8_t>(disp >> 16);
-            result[i++] = static_cast<std::uint8_t>(disp >> 24);
-        }
-
+        write_mem_tail<Op2>(static_cast<std::uint8_t>(Op1::id()), op2, result.data(), i);
         return result;
     }
 
     // SIB Encoding for MOV: mov [base + index*scale + disp], reg
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires SIBMemory<Op1> && Register<Op2>
-    inline constexpr auto encode_mov_sib([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
+    inline constexpr auto encode_mov_sib([[maybe_unused]] instruction_desc desc, [[maybe_unused]] Op1 op1, [[maybe_unused]] Op2 op2) {
         // Opcode for mov r/m, reg (89 for 32/64-bit, 88 for 8-bit)
         std::uint8_t opcode = Op2::size == 8 ? 0x88 : 0x89;
-
-        auto modrm = encode_modrm_sib(op2, op1);
-        auto sib = encode_sib(op1);
 
         constexpr bool need_rex = needs_rex_sib<Op2, typename Op1::base_type, typename Op1::index_type>();
         constexpr bool need_16bit_prefix = Op2::size == 16;
 
-        constexpr std::size_t disp_size = []() {
-            if constexpr (Op1::disp_type == e_displacement_type::disp8) {
-                return 1;
-            } else if constexpr (Op1::disp_type == e_displacement_type::disp32) {
-                return 4;
-            }
-            return 0;
-        }();
-
-        constexpr std::size_t total_size = need_16bit_prefix + need_rex + 1 + 1 + 1 + disp_size;
+        constexpr std::size_t total_size = need_16bit_prefix + need_rex + 1 + mem_tail_size<Op1>();
         std::array<std::uint8_t, total_size> result{};
         std::size_t i = 0;
 
         if constexpr (need_16bit_prefix) {
             result[i++] = 0x66;
         }
-
         if constexpr (need_rex) {
             result[i++] = encode_rex_sib<Op2, typename Op1::base_type, typename Op1::index_type>();
         }
-
         result[i++] = opcode;
-        result[i++] = modrm;
-        result[i++] = sib;
-
-        if constexpr (disp_size == 1) {
-            result[i++] = static_cast<std::uint8_t>(op1.displacement());
-        } else if constexpr (disp_size == 4) {
-            auto disp = op1.displacement();
-            result[i++] = static_cast<std::uint8_t>(disp);
-            result[i++] = static_cast<std::uint8_t>(disp >> 8);
-            result[i++] = static_cast<std::uint8_t>(disp >> 16);
-            result[i++] = static_cast<std::uint8_t>(disp >> 24);
-        }
-
+        write_mem_tail<Op1>(static_cast<std::uint8_t>(Op2::id()), op1, result.data(), i);
         return result;
     }
 
@@ -576,106 +558,54 @@ namespace static_asm::x86 {
 
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Register<Op1> && SIBMemory<Op2>
-    inline constexpr auto encode_alu_sib([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
+    inline constexpr auto encode_alu_sib([[maybe_unused]] instruction_desc desc, [[maybe_unused]] Op1 op1, [[maybe_unused]] Op2 op2) {
         // Get base opcode and adjust for direction bit (reg, r/m -> d=1, so opcode | 0x02)
         auto opcode = desc.primary_opcode();
         opcode = encode_opcode_alu<Op1, Op2>(opcode);
         // For reg, mem: direction bit should indicate reg is destination
         opcode = static_cast<std::uint8_t>((opcode & 0xFC) | 0x02 | (Op1::size > 8 ? 1 : 0));
 
-        auto modrm = encode_modrm_sib(op1, op2);
-        auto sib = encode_sib(op2);
-
         constexpr bool need_rex = needs_rex_sib<Op1, typename Op2::base_type, typename Op2::index_type>();
         constexpr bool need_16bit_prefix = Op1::size == 16;
 
-        constexpr std::size_t disp_size = []() {
-            if constexpr (Op2::disp_type == e_displacement_type::disp8) {
-                return 1;
-            } else if constexpr (Op2::disp_type == e_displacement_type::disp32) {
-                return 4;
-            }
-            return 0;
-        }();
-
-        constexpr std::size_t total_size = need_16bit_prefix + need_rex + 1 + 1 + 1 + disp_size;
+        constexpr std::size_t total_size = need_16bit_prefix + need_rex + 1 + mem_tail_size<Op2>();
         std::array<std::uint8_t, total_size> result{};
         std::size_t i = 0;
 
         if constexpr (need_16bit_prefix) {
             result[i++] = 0x66;
         }
-
         if constexpr (need_rex) {
             result[i++] = encode_rex_sib<Op1, typename Op2::base_type, typename Op2::index_type>();
         }
-
         result[i++] = opcode;
-        result[i++] = modrm;
-        result[i++] = sib;
-
-        if constexpr (disp_size == 1) {
-            result[i++] = static_cast<std::uint8_t>(op2.displacement());
-        } else if constexpr (disp_size == 4) {
-            auto disp = op2.displacement();
-            result[i++] = static_cast<std::uint8_t>(disp);
-            result[i++] = static_cast<std::uint8_t>(disp >> 8);
-            result[i++] = static_cast<std::uint8_t>(disp >> 16);
-            result[i++] = static_cast<std::uint8_t>(disp >> 24);
-        }
-
+        write_mem_tail<Op2>(static_cast<std::uint8_t>(Op1::id()), op2, result.data(), i);
         return result;
     }
 
     // ALU with SIB memory as destination
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires SIBMemory<Op1> && Register<Op2>
-    inline constexpr auto encode_alu_sib([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
+    inline constexpr auto encode_alu_sib([[maybe_unused]] instruction_desc desc, [[maybe_unused]] Op1 op1, [[maybe_unused]] Op2 op2) {
         auto opcode = desc.primary_opcode();
         // For mem, reg: d=0, direction bit clear
         opcode = static_cast<std::uint8_t>((opcode & 0xFC) | (Op2::size > 8 ? 1 : 0));
 
-        auto modrm = encode_modrm_sib(op2, op1);
-        auto sib = encode_sib(op1);
-
         constexpr bool need_rex = needs_rex_sib<Op2, typename Op1::base_type, typename Op1::index_type>();
         constexpr bool need_16bit_prefix = Op2::size == 16;
 
-        constexpr std::size_t disp_size = []() {
-            if constexpr (Op1::disp_type == e_displacement_type::disp8) {
-                return 1;
-            } else if constexpr (Op1::disp_type == e_displacement_type::disp32) {
-                return 4;
-            }
-            return 0;
-        }();
-
-        constexpr std::size_t total_size = need_16bit_prefix + need_rex + 1 + 1 + 1 + disp_size;
+        constexpr std::size_t total_size = need_16bit_prefix + need_rex + 1 + mem_tail_size<Op1>();
         std::array<std::uint8_t, total_size> result{};
         std::size_t i = 0;
 
         if constexpr (need_16bit_prefix) {
             result[i++] = 0x66;
         }
-
         if constexpr (need_rex) {
             result[i++] = encode_rex_sib<Op2, typename Op1::base_type, typename Op1::index_type>();
         }
-
         result[i++] = opcode;
-        result[i++] = modrm;
-        result[i++] = sib;
-
-        if constexpr (disp_size == 1) {
-            result[i++] = static_cast<std::uint8_t>(op1.displacement());
-        } else if constexpr (disp_size == 4) {
-            auto disp = op1.displacement();
-            result[i++] = static_cast<std::uint8_t>(disp);
-            result[i++] = static_cast<std::uint8_t>(disp >> 8);
-            result[i++] = static_cast<std::uint8_t>(disp >> 16);
-            result[i++] = static_cast<std::uint8_t>(disp >> 24);
-        }
-
+        write_mem_tail<Op1>(static_cast<std::uint8_t>(Op2::id()), op1, result.data(), i);
         return result;
     }
 
@@ -685,50 +615,24 @@ namespace static_asm::x86 {
 
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Register<Op1> && SIBMemory<Op2>
-    inline constexpr auto encode_lea_sib([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
+    inline constexpr auto encode_lea_sib([[maybe_unused]] instruction_desc desc, [[maybe_unused]] Op1 op1, [[maybe_unused]] Op2 op2) {
         std::uint8_t opcode = 0x8D; // LEA opcode
-
-        auto modrm = encode_modrm_sib(op1, op2);
-        auto sib = encode_sib(op2);
 
         constexpr bool need_rex = needs_rex_sib<Op1, typename Op2::base_type, typename Op2::index_type>();
         constexpr bool need_16bit_prefix = Op1::size == 16;
 
-        constexpr std::size_t disp_size = []() {
-            if constexpr (Op2::disp_type == e_displacement_type::disp8) {
-                return 1;
-            } else if constexpr (Op2::disp_type == e_displacement_type::disp32) {
-                return 4;
-            }
-            return 0;
-        }();
-
-        constexpr std::size_t total_size = need_16bit_prefix + need_rex + 1 + 1 + 1 + disp_size;
+        constexpr std::size_t total_size = need_16bit_prefix + need_rex + 1 + mem_tail_size<Op2>();
         std::array<std::uint8_t, total_size> result{};
         std::size_t i = 0;
 
         if constexpr (need_16bit_prefix) {
             result[i++] = 0x66;
         }
-
         if constexpr (need_rex) {
             result[i++] = encode_rex_sib<Op1, typename Op2::base_type, typename Op2::index_type>();
         }
-
         result[i++] = opcode;
-        result[i++] = modrm;
-        result[i++] = sib;
-
-        if constexpr (disp_size == 1) {
-            result[i++] = static_cast<std::uint8_t>(op2.displacement());
-        } else if constexpr (disp_size == 4) {
-            auto disp = op2.displacement();
-            result[i++] = static_cast<std::uint8_t>(disp);
-            result[i++] = static_cast<std::uint8_t>(disp >> 8);
-            result[i++] = static_cast<std::uint8_t>(disp >> 16);
-            result[i++] = static_cast<std::uint8_t>(disp >> 24);
-        }
-
+        write_mem_tail<Op2>(static_cast<std::uint8_t>(Op1::id()), op2, result.data(), i);
         return result;
     }
 
@@ -833,19 +737,6 @@ namespace static_asm::x86 {
             opcode = static_cast<std::uint8_t>(opcode - 1); // FF->FE or F7->F6
         }
 
-        constexpr e_displacement_type dt = Op1::disp_type;
-        constexpr bool forced_disp8 = sib_needs_forced_disp8<Op1>();
-
-        e_mod mod = e_mod::register_indirect_addressing; // mod=00
-        if constexpr (dt == e_displacement_type::disp8 || forced_disp8) {
-            mod = e_mod::one_byte_signed_displacement; // mod=01
-        } else if constexpr (dt == e_displacement_type::disp32) {
-            mod = e_mod::four_byte_signed_displacement; // mod=10
-        }
-
-        std::uint8_t modrm = static_cast<std::uint8_t>((static_cast<std::uint8_t>(mod) << 6) | ((ext & 0b111) << 3) | 0b100);
-        std::uint8_t sib = encode_sib(op1);
-
         // REX.W from operand size; REX.X/B from the SIB index/base registers.
         constexpr bool rex_w = (Op1::size >= 64);
         constexpr bool rex_x = needs_rex_x<typename Op1::index_type>();
@@ -853,9 +744,7 @@ namespace static_asm::x86 {
         constexpr bool need_rex = rex_w || rex_x || rex_b;
         constexpr bool need_16bit_prefix = (Op1::size == 16);
 
-        constexpr std::size_t disp_size = (dt == e_displacement_type::disp8 || forced_disp8) ? 1u : (dt == e_displacement_type::disp32 ? 4u : 0u);
-
-        constexpr std::size_t total_size = need_16bit_prefix + need_rex + 1 /*opcode*/ + 1 /*modrm*/ + 1 /*sib*/ + disp_size;
+        constexpr std::size_t total_size = need_16bit_prefix + need_rex + 1 /*opcode*/ + mem_tail_size<Op1>();
         std::array<std::uint8_t, total_size> result{};
         std::size_t i = 0;
 
@@ -866,19 +755,7 @@ namespace static_asm::x86 {
             result[i++] = static_cast<std::uint8_t>((0b0100 << 4) | (rex_w << 3) | (0 << 2) | (rex_x << 1) | rex_b);
         }
         result[i++] = opcode;
-        result[i++] = modrm;
-        result[i++] = sib;
-
-        if constexpr (disp_size == 1) {
-            result[i++] = static_cast<std::uint8_t>(op1.displacement());
-        } else if constexpr (disp_size == 4) {
-            auto disp = op1.displacement();
-            result[i++] = static_cast<std::uint8_t>(disp);
-            result[i++] = static_cast<std::uint8_t>(disp >> 8);
-            result[i++] = static_cast<std::uint8_t>(disp >> 16);
-            result[i++] = static_cast<std::uint8_t>(disp >> 24);
-        }
-
+        write_mem_tail<Op1>(ext, op1, result.data(), i);
         return result;
     }
 
@@ -1055,28 +932,13 @@ namespace static_asm::x86 {
             opcode = static_cast<std::uint8_t>(opcode - 1); // F7->F6
         }
 
-        constexpr e_displacement_type dt = Op1::disp_type;
-        constexpr bool forced_disp8 = sib_needs_forced_disp8<Op1>();
-
-        e_mod mod = e_mod::register_indirect_addressing; // mod=00
-        if constexpr (dt == e_displacement_type::disp8 || forced_disp8) {
-            mod = e_mod::one_byte_signed_displacement; // mod=01
-        } else if constexpr (dt == e_displacement_type::disp32) {
-            mod = e_mod::four_byte_signed_displacement; // mod=10
-        }
-
-        std::uint8_t modrm = static_cast<std::uint8_t>((static_cast<std::uint8_t>(mod) << 6) | ((ext & 0b111) << 3) | 0b100);
-        std::uint8_t sib = encode_sib(op1);
-
         constexpr bool rex_w = (Op1::size >= 64);
         constexpr bool rex_x = needs_rex_x<typename Op1::index_type>();
         constexpr bool rex_b = needs_rex_b_sib<typename Op1::base_type>();
         constexpr bool need_rex = rex_w || rex_x || rex_b;
         constexpr bool need_16bit_prefix = (Op1::size == 16);
 
-        constexpr std::size_t disp_size = (dt == e_displacement_type::disp8 || forced_disp8) ? 1u : (dt == e_displacement_type::disp32 ? 4u : 0u);
-
-        constexpr std::size_t total_size = need_16bit_prefix + need_rex + 1 /*opcode*/ + 1 /*modrm*/ + 1 /*sib*/ + disp_size;
+        constexpr std::size_t total_size = need_16bit_prefix + need_rex + 1 /*opcode*/ + mem_tail_size<Op1>();
         std::array<std::uint8_t, total_size> result{};
         std::size_t i = 0;
 
@@ -1087,19 +949,7 @@ namespace static_asm::x86 {
             result[i++] = static_cast<std::uint8_t>((0b0100 << 4) | (rex_w << 3) | (0 << 2) | (rex_x << 1) | rex_b);
         }
         result[i++] = opcode;
-        result[i++] = modrm;
-        result[i++] = sib;
-
-        if constexpr (disp_size == 1) {
-            result[i++] = static_cast<std::uint8_t>(op1.displacement());
-        } else if constexpr (disp_size == 4) {
-            auto disp = op1.displacement();
-            result[i++] = static_cast<std::uint8_t>(disp);
-            result[i++] = static_cast<std::uint8_t>(disp >> 8);
-            result[i++] = static_cast<std::uint8_t>(disp >> 16);
-            result[i++] = static_cast<std::uint8_t>(disp >> 24);
-        }
-
+        write_mem_tail<Op1>(ext, op1, result.data(), i);
         return result;
     }
 
