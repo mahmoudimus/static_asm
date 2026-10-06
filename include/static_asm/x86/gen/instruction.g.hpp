@@ -1217,7 +1217,7 @@ namespace static_asm::x86::instructions {
     }
 
     template<typename Op1, typename Op2>
-        requires Register<Op1> && Register<Op2>
+        requires(Register<Op1> || (Memory<Op1> && Register<typename Op1::value_type>) || SIBMemory<Op1>) && (Register<Op2> || (Memory<Op2> && Register<typename Op2::value_type>) || SIBMemory<Op2>)
     inline constexpr auto xchg(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::xchg>(op1, op2);
     }

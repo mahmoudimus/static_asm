@@ -1361,6 +1361,67 @@ namespace static_asm::x86 {
         return internal::encode<Id, Op1, Op2>(desc, opcode, encode_modrm(op1, op2));
     }
 
+    // XCHG reg, [reg] / [reg], reg (register-indirect memory, no SIB).
+    // XCHG is symmetric: 87 /r (86 /r for 8-bit), register always in reg field.
+    template<e_instruction_id Id, typename Op1, typename Op2>
+        requires Register<Op1> && Memory<Op2> && Register<typename Op2::value_type>
+    inline constexpr auto encode_xchg([[maybe_unused]] instruction_desc desc, const Op1& op1, const Op2& op2) {
+        auto opcode = desc.primary_opcode();
+        if constexpr (Op1::size == 8) {
+            opcode = static_cast<std::uint8_t>(opcode - 1);
+        }
+        return internal::encode<Id, Op1, Op2>(desc, opcode, encode_modrm(op1, op2));
+    }
+
+    template<e_instruction_id Id, typename Op1, typename Op2>
+        requires Memory<Op1> && Register<typename Op1::value_type> && Register<Op2>
+    inline constexpr auto encode_xchg([[maybe_unused]] instruction_desc desc, const Op1& op1, const Op2& op2) {
+        auto opcode = desc.primary_opcode();
+        if constexpr (Op2::size == 8) {
+            opcode = static_cast<std::uint8_t>(opcode - 1);
+        }
+        return internal::encode<Id, Op2, Op1>(desc, opcode, encode_modrm(op2, op1));
+    }
+
+    // XCHG reg, [base + index*scale + disp] and the reverse (SIB form). The
+    // register goes in the reg field; the memory operand supplies r/m + SIB.
+    template<e_instruction_id Id, typename Op1, typename Op2>
+        requires(Register<Op1> && SIBMemory<Op2>) || (SIBMemory<Op1> && Register<Op2>)
+    inline constexpr auto encode_xchg([[maybe_unused]] instruction_desc desc, const Op1& op1, const Op2& op2) {
+        // Pick the register and memory operands regardless of order.
+        constexpr bool reg_first = Register<Op1>;
+        using Reg = std::conditional_t<reg_first, Op1, Op2>;
+        using Mem = std::conditional_t<reg_first, Op2, Op1>;
+        const Mem& mem = [&]() -> const Mem& {
+            if constexpr (reg_first)
+                return op2;
+            else
+                return op1;
+        }();
+
+        auto opcode = desc.primary_opcode();
+        if constexpr (Reg::size == 8) {
+            opcode = static_cast<std::uint8_t>(opcode - 1);
+        }
+
+        constexpr bool need_rex = needs_rex_sib<Reg, typename Mem::base_type, typename Mem::index_type>();
+        constexpr bool need_16bit_prefix = Reg::size == 16;
+
+        constexpr std::size_t total_size = need_16bit_prefix + need_rex + 1 + mem_tail_size<Mem>();
+        std::array<std::uint8_t, total_size> result{};
+        std::size_t i = 0;
+
+        if constexpr (need_16bit_prefix) {
+            result[i++] = 0x66;
+        }
+        if constexpr (need_rex) {
+            result[i++] = encode_rex_sib<Reg, typename Mem::base_type, typename Mem::index_type>();
+        }
+        result[i++] = opcode;
+        write_mem_tail<Mem>(static_cast<std::uint8_t>(Reg::id()), mem, result.data(), i);
+        return result;
+    }
+
     // =========================================================================
     // MOVZX/MOVSX - Move with Zero/Sign Extension
     // =========================================================================
@@ -1617,6 +1678,8 @@ namespace static_asm::x86 {
                 return encode_mov_sib<Id>(desc, op1, op2);
             } else if constexpr (desc.encoding() == e_encoding::lea) {
                 return encode_lea_sib<Id>(desc, op1, op2);
+            } else if constexpr (desc.encoding() == e_encoding::xchg) {
+                return encode_xchg<Id>(desc, op1, op2);
             } else {
                 static_assert(sizeof(Op1) == 0, "SIB addressing not supported for this instruction type");
             }

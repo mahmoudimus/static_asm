@@ -27,3 +27,18 @@ TEST(MemDestImm, Alu) {
     EXPECT_EQ(and_(qword_ptr(r8 + std::int8_t(0x10)), 0xF),
         (internal::make_array<std::uint8_t>(0x49, 0x81, 0x60, 0x10, 0x0F, 0x00, 0x00, 0x00)));
 }
+
+// XCHG with a memory operand (symmetric; register always in the reg field).
+// Verified against ndisasm.
+TEST(XchgMemory, RegisterIndirect) {
+    EXPECT_EQ(xchg(qword_ptr(rcx), rax), (internal::make_array<std::uint8_t>(0x48, 0x87, 0x01)));
+    EXPECT_EQ(xchg(rax, qword_ptr(rcx)), (internal::make_array<std::uint8_t>(0x48, 0x87, 0x01)));
+    EXPECT_EQ(xchg(byte_ptr(rax), cl), (internal::make_array<std::uint8_t>(0x86, 0x08)));
+}
+
+TEST(XchgMemory, SibAndDisp) {
+    EXPECT_EQ(xchg(qword_ptr(rcx + std::int8_t(0x10)), rbx), (internal::make_array<std::uint8_t>(0x48, 0x87, 0x59, 0x10)));
+    EXPECT_EQ(xchg(rbx, qword_ptr(rcx + std::int8_t(0x10))), (internal::make_array<std::uint8_t>(0x48, 0x87, 0x59, 0x10)));
+    EXPECT_EQ(xchg(dword_ptr(rsp + std::int8_t(0x8)), ecx), (internal::make_array<std::uint8_t>(0x87, 0x4C, 0x24, 0x08)));
+    EXPECT_EQ(xchg(r8, qword_ptr(rbx + std::int8_t(0x4))), (internal::make_array<std::uint8_t>(0x4C, 0x87, 0x43, 0x04)));
+}
