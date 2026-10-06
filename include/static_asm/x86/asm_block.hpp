@@ -62,6 +62,44 @@ namespace static_asm::x86 {
             frags_[frag_count_++] = frag{ frag_kind::bytes, off, static_cast<std::uint16_t>(N), 0, false, 0, 0 };
         }
 
+        // Append a RIP-relative instruction and resolve its disp32 to `target`.
+        // The instruction must be built with a `rip + 0` placeholder operand and
+        // must end in its disp32 (i.e. no trailing immediate) - the last four
+        // bytes are patched to make the operand point at `target`. Example:
+        //     auto data = b.label();
+        //     b.put_rip(lea(rax, qword_ptr(rip + 0)), data);  // lea rax,[rip+data]
+        //     ...
+        //     b.bind(data);
+        //     b.dq(0xCAFEBABE);
+        template<std::size_t N>
+        constexpr void put_rip(const std::array<std::uint8_t, N>& instr, label_id target) {
+            static_assert(N >= 5, "a RIP-relative instruction is at least 5 bytes");
+            auto off = static_cast<std::uint16_t>(pool_count_);
+            for (std::size_t i = 0; i < N; ++i) {
+                pool_[pool_count_++] = instr[i];
+            }
+            frags_[frag_count_++] = frag{ frag_kind::rip_bytes, off, static_cast<std::uint16_t>(N), 0, false, 0, target };
+        }
+
+        // Data directives: emit raw little-endian data. Bind a label before one
+        // of these to reference the data (e.g. via put_rip).
+        constexpr void db(std::uint8_t v) {
+            put(std::array<std::uint8_t, 1>{ v });
+        }
+        constexpr void dw(std::uint16_t v) {
+            put(std::array<std::uint8_t, 2>{ static_cast<std::uint8_t>(v), static_cast<std::uint8_t>(v >> 8) });
+        }
+        constexpr void dd(std::uint32_t v) {
+            put(std::array<std::uint8_t, 4>{ static_cast<std::uint8_t>(v), static_cast<std::uint8_t>(v >> 8),
+                static_cast<std::uint8_t>(v >> 16), static_cast<std::uint8_t>(v >> 24) });
+        }
+        constexpr void dq(std::uint64_t v) {
+            put(std::array<std::uint8_t, 8>{ static_cast<std::uint8_t>(v), static_cast<std::uint8_t>(v >> 8),
+                static_cast<std::uint8_t>(v >> 16), static_cast<std::uint8_t>(v >> 24),
+                static_cast<std::uint8_t>(v >> 32), static_cast<std::uint8_t>(v >> 40),
+                static_cast<std::uint8_t>(v >> 48), static_cast<std::uint8_t>(v >> 56) });
+        }
+
         // Branches to a (possibly forward) label. Width is chosen by relaxation.
         constexpr void jmp(label_id l) {
             branch(0xEB, false, 0xE9, l);
@@ -146,6 +184,18 @@ namespace static_asm::x86 {
                     for (std::uint16_t k = 0; k < f.len; ++k) {
                         out[pos++] = pool_[f.off + k];
                     }
+                } else if (f.kind == frag_kind::rip_bytes) {
+                    std::size_t start = pos;
+                    for (std::uint16_t k = 0; k < f.len; ++k) {
+                        out[pos++] = pool_[f.off + k];
+                    }
+                    // RIP displacement is relative to the end of the instruction.
+                    std::int32_t disp = static_cast<std::int32_t>(st.label_off[f.target]) - static_cast<std::int32_t>(start + f.len);
+                    std::size_t d = start + f.len - 4; // disp32 occupies the last 4 bytes
+                    out[d + 0] = static_cast<std::uint8_t>(disp & 0xFF);
+                    out[d + 1] = static_cast<std::uint8_t>((disp >> 8) & 0xFF);
+                    out[d + 2] = static_cast<std::uint8_t>((disp >> 16) & 0xFF);
+                    out[d + 3] = static_cast<std::uint8_t>((disp >> 24) & 0xFF);
                 } else if (f.kind == frag_kind::branch) {
                     std::size_t instr_end = f_offset(st, i) + frag_size(st, i);
                     std::int32_t disp = static_cast<std::int32_t>(st.label_off[f.target]) - static_cast<std::int32_t>(instr_end);
@@ -170,6 +220,7 @@ namespace static_asm::x86 {
 
     private:
         enum class frag_kind : std::uint8_t { bytes,
+            rip_bytes,
             branch,
             label };
 
@@ -203,8 +254,8 @@ namespace static_asm::x86 {
 
         constexpr std::size_t frag_size(const relax_state& st, std::size_t i) const {
             const frag& f = frags_[i];
-            if (f.kind == frag_kind::bytes) {
-                return f.len;
+            if (f.kind == frag_kind::bytes || f.kind == frag_kind::rip_bytes) {
+                return f.len; // fixed size (RIP-relative instructions never relax)
             }
             if (f.kind == frag_kind::branch) {
                 return st.is_long[i] ? rel32_len(f) : 2u;

@@ -130,3 +130,40 @@ TEST(AsmBlock, LabelGivesPatchOffset) {
     EXPECT_EQ(off, 1u); // movabs starts right after the nop
     EXPECT_EQ(off + 2, 3u); // imm64 slot sits after the 48 B8 opcode
 }
+
+// Data directives + RIP-relative label references (position-independent data).
+TEST(AsmBlock, RipLabelForwardData) {
+    constexpr auto code = build([](asm_block<>& b) {
+        auto data = b.label();
+        b.put_rip(lea(rax, qword_ptr(rip + 0)), data); // lea rax,[rip+data]
+        b.put(ret());
+        b.bind(data);
+        b.dq(0xCAFEBABEULL);
+    });
+    // lea rax,[rip+1] ; ret ; dq 0xCAFEBABE
+    EXPECT_EQ(code, (internal::make_array<std::uint8_t>(
+                        0x48, 0x8D, 0x05, 0x01, 0x00, 0x00, 0x00, 0xC3,
+                        0xBE, 0xBA, 0xFE, 0xCA, 0x00, 0x00, 0x00, 0x00)));
+}
+
+TEST(AsmBlock, RipLabelBackwardData) {
+    constexpr auto code = build([](asm_block<>& b) {
+        auto data = b.label();
+        b.bind(data);
+        b.dd(0x11223344);
+        b.put_rip(mov(eax, dword_ptr(rip + 0)), data); // mov eax,[rip-10]
+    });
+    EXPECT_EQ(code, (internal::make_array<std::uint8_t>(
+                        0x44, 0x33, 0x22, 0x11,
+                        0x8B, 0x05, 0xF6, 0xFF, 0xFF, 0xFF)));
+}
+
+TEST(AsmBlock, DataDirectives) {
+    constexpr auto code = build([](asm_block<>& b) {
+        b.db(0xAB);
+        b.dw(0x1234);
+        b.dd(0xDEADBEEF);
+    });
+    EXPECT_EQ(code, (internal::make_array<std::uint8_t>(
+                        0xAB, 0x34, 0x12, 0xEF, 0xBE, 0xAD, 0xDE)));
+}
