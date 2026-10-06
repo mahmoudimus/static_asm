@@ -199,3 +199,33 @@ TEST(AsmBlock, TypedLabelHelpers) {
                         0x48, 0x89, 0x1D, 0x01, 0x00, 0x00, 0x00,
                         0xC3, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)));
 }
+
+// put_rip reaches every memory-capable mnemonic, not just lea/mov: a medley of
+// instruction families all RIP-reference the same data label. Each instruction
+// must resolve to the data qword that follows the ret. Verified vs ndisasm.
+TEST(AsmBlock, RipLabelAnyMnemonic) {
+    constexpr auto code = build([](asm_block<>& b) {
+        auto data = b.label();
+        b.put_rip(add(rax, qword_ptr(rip + 0)), data);
+        b.put_rip(sub(qword_ptr(rip + 0), rbx), data);
+        b.put_rip(cmp(rcx, qword_ptr(rip + 0)), data);
+        b.put_rip(inc(qword_ptr(rip + 0)), data);
+        b.put_rip(neg(qword_ptr(rip + 0)), data);
+        b.put_rip(mul(qword_ptr(rip + 0)), data);
+        b.put_rip(xchg(qword_ptr(rip + 0), rdx), data);
+        b.put_rip(and_(qword_ptr(rip + 0), 0x10), data, 4);
+        b.put(ret());
+        b.bind(data);
+        b.dq(0);
+    });
+    EXPECT_EQ(code, (internal::make_array<std::uint8_t>(
+                        0x48, 0x03, 0x05, 0x36, 0x00, 0x00, 0x00,
+                        0x48, 0x29, 0x1D, 0x2F, 0x00, 0x00, 0x00,
+                        0x48, 0x3B, 0x0D, 0x28, 0x00, 0x00, 0x00,
+                        0x48, 0xFF, 0x05, 0x21, 0x00, 0x00, 0x00,
+                        0x48, 0xF7, 0x1D, 0x1A, 0x00, 0x00, 0x00,
+                        0x48, 0xF7, 0x25, 0x13, 0x00, 0x00, 0x00,
+                        0x48, 0x87, 0x15, 0x0C, 0x00, 0x00, 0x00,
+                        0x48, 0x81, 0x25, 0x01, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00,
+                        0xC3, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)));
+}
