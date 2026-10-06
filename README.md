@@ -94,8 +94,27 @@ movsxd(rax, ecx);        // 48 63 C1 (sign-extend dword to qword)
 lea(rax, qword_ptr(rbx + rcx * s4));                      // 48 8D 04 8B
 lea(rax, qword_ptr(rbx + rcx * s8 + std::int8_t(0x10)));  // 48 8D 44 CB 10
 
-// Exchange
-xchg(rax, rbx);          // 48 87 D8
+// Exchange (register or memory; XCHG is symmetric)
+xchg(rax, rbx);                                  // 48 87 D8
+xchg(qword_ptr(rcx), rax);                       // 48 87 01
+xchg(rbx, qword_ptr(rcx + std::int8_t(0x10)));   // 48 87 59 10
+
+// Store an immediate to a displaced / SIB / RIP memory destination
+mov(dword_ptr(rbp - std::int8_t(0x20)), 0x100);  // C7 45 E0 00 01 00 00
+mov(qword_ptr(rcx + std::int8_t(0x10)), 1);      // 48 C7 41 10 01 00 00 00
+add(qword_ptr(rbx + std::int8_t(0x8)), 0x10);    // 48 81 43 08 10 00 00 00
+```
+
+### RIP-Relative Addressing
+
+`rip + disp` (and `rip - disp`) encode the 64-bit RIP-relative form (ModR/M
+`mod=00 r/m=101`, a mandatory `disp32`, never a SIB byte):
+
+```cpp
+mov(rax, qword_ptr(rip + 0x10));   // 48 8B 05 10 00 00 00
+lea(rax, qword_ptr(rip + 0x100));  // 48 8D 05 00 01 00 00
+add(qword_ptr(rip + 0x20), rbx);   // 48 01 1D 20 00 00 00
+inc(qword_ptr(rip + 0x40));        // 48 FF 05 40 00 00 00
 ```
 
 ### SIB Addressing (Scale-Index-Base)
@@ -265,6 +284,23 @@ Labels are handles (`b.label()` / `b.bind()` / `b.jne(label)`), not strings.
 `call` to a label is always rel32 (it has no short form). The block has a fixed
 capacity for heap-free `constexpr` use: `asm_block<BytePool, MaxFrag, MaxLabel>`,
 with generous defaults — raise them for larger programs.
+
+**Data directives and RIP-relative label references.** `db`/`dw`/`dd`/`dq` emit
+raw little-endian data into the block, and `put_rip` appends a RIP-relative
+instruction (built with a `rip + 0` placeholder) whose `disp32` is resolved to a
+label — together giving position-independent data access:
+
+```cpp
+constexpr auto code = build([](asm_block<>& b) {
+    auto data = b.label();
+    b.put_rip(lea(rax, qword_ptr(rip + 0)), data);  // lea rax,[rip+data]
+    b.put(ret());
+    b.bind(data);
+    b.dq(0xCAFEBABE);
+});
+// 48 8D 05 01 00 00 00  C3  BE BA FE CA 00 00 00 00
+// lea rax,[rip+1] points exactly at the embedded qword.
+```
 
 ### Conditional Moves
 
@@ -484,7 +520,7 @@ Note: The `core::emit()` inline assembly feature requires Clang with -O2 optimiz
 | ALU | ADD, ADC, SUB, SBB, AND, OR, XOR, CMP, TEST |
 | Unary | INC, DEC, NEG, NOT |
 | Multiply/Divide | MUL, IMUL (1/2/3 operand forms), DIV, IDIV |
-| Data Movement | MOV, MOVABS, MOVZX, MOVSX, MOVSXD, LEA, XCHG, PUSH, POP |
+| Data Movement | MOV, MOVABS, MOVZX, MOVSX, MOVSXD, LEA, XCHG (reg and memory), PUSH, POP |
 | Shift/Rotate | SHL, SHR, SAL, SAR, ROL, ROR, RCL, RCR |
 | Control Flow | JMP, CALL, RET, RETF |
 | Conditional Jumps | JZ/JE, JNZ/JNE, JB/JC, JNB/JNC, JBE/JNA, JNBE/JA, JL, JNL, JLE, JNLE, JO, JNO, JS, JNS, JP, JNP (8-bit and 32-bit offsets) |
@@ -495,15 +531,16 @@ Note: The `core::emit()` inline assembly feature requires Clang with -O2 optimiz
 | System | SYSCALL, SYSENTER, SYSEXIT, INT, INT3, IRET/D/Q, CLI, STI, HLT, CPUID, RDTSC, RDTSCP |
 | Misc | NOP, UD2 |
 | Prefixes | LOCK (`lock_`), REP/REPE/REPNE (string ops) |
-| Assembler layer | `asm_block` + `build()`: labels, branch relaxation (rel8/rel32), patch offsets |
+| Assembler layer | `asm_block` + `build()`: labels, branch relaxation (rel8/rel32), patch offsets, `db`/`dw`/`dd`/`dq` data, RIP-relative label refs (`put_rip`) |
 
 **Operand support:**
 - All 8/16/32/64-bit general purpose registers (AL-R15)
 - Extended registers (R8-R15, R8D-R15D, R8W-R15W, R8B-R15B)
 - Immediate values (8/16/32/64-bit)
-- Memory operands: `[reg]`, `[reg +/- disp]` (canonical ModR/M-only), `[disp32]` (absolute)
+- Memory operands: `[reg]`, `[reg +/- disp]` (canonical ModR/M-only), `[disp32]` (absolute), `[rip +/- disp32]`
 - SIB addressing: `[base + index*scale + disp]` with scale factors 1, 2, 4, 8
 - Memory destinations for the unary (INC/DEC/NEG/NOT) and MUL/IMUL/DIV/IDIV groups
+- Memory destination + immediate for base/displaced/SIB/RIP addressing (MOV and the ALU group)
 
 **Note**: No SIMD/AVX extensions yet.
 
@@ -511,17 +548,13 @@ Note: The `core::emit()` inline assembly feature requires Clang with -O2 optimiz
 
 Known gaps, roughly in priority order:
 
-- **Memory destination + immediate for base/indexed addressing.** `mov`/`add`/...
-  with an immediate into a displaced or SIB memory operand
-  (`mov(dword_ptr(rbp - std::int8_t(0x20)), 0x100)`) is not yet encodable. Only
-  register-indirect (`[reg]`) and absolute (`[disp32]`) memory destinations
-  accept an immediate today.
-- **`xchg` with a memory operand.** `xchg` is currently register-only.
-- **Label-aware `asm_block` coverage.** `asm_block` wraps raw instruction arrays
-  plus `jmp`/`jcc`/`call` to labels; it does not yet offer typed helpers for
-  every instruction, RIP-relative label references, or data/`.byte` directives
-  between labels.
-- **RIP-relative addressing** (`[rip + disp32]`) as an operand form.
+- **`asm_block` typed helpers.** The block wraps raw instruction arrays
+  (`put`), branch-to-label (`jmp`/`jcc`/`call`), data (`db`/`dw`/`dd`/`dq`) and
+  RIP-relative label references (`put_rip`). It does not yet offer per-mnemonic
+  typed helpers that take a label directly for every instruction.
+- **`put_rip` with a trailing immediate.** `put_rip` patches the last four bytes
+  of an instruction, so a RIP-relative form that ends in an immediate (e.g.
+  `mov(dword_ptr(rip + 0), imm)`) is not supported via a label yet.
 - **No SIMD/AVX/VEX/EVEX**, x87, or segment-override prefixes.
 
 ## Developing
