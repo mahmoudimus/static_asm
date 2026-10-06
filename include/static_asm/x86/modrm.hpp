@@ -152,6 +152,19 @@ namespace static_asm::x86 {
         }
     }
 
+    // RIP-relative: base is the instruction pointer (`rip`). In 64-bit mode
+    // this is the special ModR/M form mod=00, r/m=101 with a mandatory disp32
+    // (and never a SIB byte). It is distinct from a general-register base.
+    template<typename SIBMem>
+        requires SIBMemory<SIBMem>
+    inline constexpr bool mem_is_rip() {
+        if constexpr (SIBMem::has_base) {
+            return SIBMem::base_type::id_value == e_register_id::ip;
+        } else {
+            return false;
+        }
+    }
+
     // =========================================================================
     // Canonical memory addressing: SIB byte only when the hardware requires it
     // =========================================================================
@@ -159,11 +172,14 @@ namespace static_asm::x86 {
     // A SIB byte is needed only when there is an index register, or the base's
     // low 3 bits are 100 (RSP/R12 — r/m=100 means "SIB follows", so these bases
     // cannot be encoded without one), or there is no base (disp32-only form).
-    // Every other base uses the shorter ModR/M-only form with r/m = base.
+    // RIP-relative never uses one. Every other base uses the shorter
+    // ModR/M-only form with r/m = base.
     template<typename SIBMem>
         requires SIBMemory<SIBMem>
     inline constexpr bool mem_uses_sib() {
-        if constexpr (SIBMem::has_index) {
+        if constexpr (mem_is_rip<SIBMem>()) {
+            return false;
+        } else if constexpr (SIBMem::has_index) {
             return true;
         } else if constexpr (!SIBMem::has_base) {
             return true;
@@ -172,12 +188,15 @@ namespace static_asm::x86 {
         }
     }
 
-    // ModR/M mod field for a memory operand: disp8 (or a forced disp8 for an
-    // RBP/R13 base with no displacement) -> 01, disp32 -> 10, otherwise 00.
+    // ModR/M mod field for a memory operand: RIP-relative uses mod=00; otherwise
+    // disp8 (or a forced disp8 for an RBP/R13 base with no displacement) -> 01,
+    // disp32 -> 10, no displacement -> 00.
     template<typename SIBMem>
         requires SIBMemory<SIBMem>
     inline constexpr e_mod mem_mod() {
-        if constexpr (SIBMem::disp_type == e_displacement_type::disp8 || sib_needs_forced_disp8<SIBMem>()) {
+        if constexpr (mem_is_rip<SIBMem>()) {
+            return e_mod::register_indirect_addressing; // mod=00 + r/m=101 => RIP-relative
+        } else if constexpr (SIBMem::disp_type == e_displacement_type::disp8 || sib_needs_forced_disp8<SIBMem>()) {
             return e_mod::one_byte_signed_displacement;
         } else if constexpr (SIBMem::disp_type == e_displacement_type::disp32) {
             return e_mod::four_byte_signed_displacement;
@@ -191,7 +210,9 @@ namespace static_asm::x86 {
     template<typename SIBMem>
         requires SIBMemory<SIBMem>
     inline constexpr std::size_t mem_disp_size() {
-        if constexpr (SIBMem::disp_type == e_displacement_type::disp8 || sib_needs_forced_disp8<SIBMem>()) {
+        if constexpr (mem_is_rip<SIBMem>()) {
+            return 4; // RIP-relative always carries a disp32
+        } else if constexpr (SIBMem::disp_type == e_displacement_type::disp8 || sib_needs_forced_disp8<SIBMem>()) {
             return 1;
         } else if constexpr (SIBMem::disp_type == e_displacement_type::disp32) {
             return 4;
@@ -201,12 +222,20 @@ namespace static_asm::x86 {
     }
 
     // ModR/M byte for a memory operand, with `reg_bits` in the reg field (a
-    // register's low 3 bits, or an opcode-group extension). r/m is 100 when a
-    // SIB byte follows, otherwise the base register's low 3 bits.
+    // register's low 3 bits, or an opcode-group extension). r/m is 101 for
+    // RIP-relative, 100 when a SIB byte follows, otherwise the base register's
+    // low 3 bits.
     template<typename SIBMem>
         requires SIBMemory<SIBMem>
     inline constexpr std::uint8_t encode_modrm_mem(std::uint8_t reg_bits) {
-        std::uint8_t rm = mem_uses_sib<SIBMem>() ? 0b100 : (static_cast<std::uint8_t>(SIBMem::base_type::id()) & 0b111);
+        std::uint8_t rm;
+        if constexpr (mem_is_rip<SIBMem>()) {
+            rm = 0b101;
+        } else if constexpr (mem_uses_sib<SIBMem>()) {
+            rm = 0b100;
+        } else {
+            rm = static_cast<std::uint8_t>(SIBMem::base_type::id()) & 0b111;
+        }
         return static_cast<std::uint8_t>((static_cast<std::uint8_t>(mem_mod<SIBMem>()) << 6) | ((reg_bits & 0b111) << 3) | rm);
     }
 

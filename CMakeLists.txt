@@ -104,6 +104,7 @@ if(STATIC_ASM_BUILD_TESTS)
         tests/test_alu.cpp
         tests/test_asm_block.cpp
         tests/test_mem_imm.cpp
+        tests/test_riprel.cpp
         tests/test_bitscan.cpp
         tests/test_bt.cpp
         tests/test_call.cpp
