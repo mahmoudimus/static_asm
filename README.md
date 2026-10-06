@@ -528,7 +528,9 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release -DSTATIC_ASM_BUILD_EXAMPLES=ON
 - macOS (Apple Clang, Clang)
 - Windows (MSVC 2022+)
 
-Note: The `core::emit()` inline assembly feature requires Clang with -O2 optimization.
+Note: The `core::emit()` inline assembly feature requires GCC or Clang targeting
+x86 or x86-64 with -O2 optimization. Other targets can still build instruction
+byte arrays, but cannot place x86 bytes in their instruction stream.
 
 ## Supported Instructions
 

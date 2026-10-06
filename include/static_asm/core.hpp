@@ -78,17 +78,17 @@ namespace static_asm::core {
     // The emit functions use GCC-style extended inline assembly to inject raw
     // machine code bytes directly into the instruction stream at compile time.
     //
-    // Supported compilers:
-    //   - Clang (Linux, macOS)
-    //   - GCC (Linux)
+    // Supported compilers and targets:
+    //   - Clang or GCC targeting x86 or x86-64
     //
     // NOT supported:
     //   - MSVC: Does not support inline assembly for x64 targets
     //   - clang-cl: Uses MSVC codegen which doesn't support this syntax
+    //   - Non-x86 targets: These bytes are x86 instructions
     //
     // Usage requires -O2 or higher optimization to ensure the asm is inlined.
 
-#if (defined(__clang__) || defined(__GNUC__)) && !defined(_MSC_VER)
+#if (defined(__clang__) || defined(__GNUC__)) && !defined(_MSC_VER) && (defined(__i386__) || defined(__x86_64__))
 
     namespace detail {
 
@@ -193,34 +193,27 @@ namespace static_asm::core {
 
 #else
 
-    // Stub for unsupported compilers (MSVC, clang-cl)
-    // MSVC does not support inline assembly for x64, so emit() cannot be implemented.
+    // Stub for unsupported compilers or targets.
     // The library's core functionality (compile-time instruction encoding) still works.
     // Only the emit() feature for direct code injection is unavailable.
 
     template<FixedByteArray T>
     inline void emit([[maybe_unused]] const T& code) {
         static_assert(sizeof(T) == 0,
-            "emit() is not supported on this compiler. "
-            "MSVC does not support inline assembly for x64. "
-            "Use Clang or GCC instead.");
+            "core::emit requires GCC or Clang targeting x86 or x86-64.");
     }
 
     template<std::size_t N>
     inline void emit([[maybe_unused]] const std::array<std::uint8_t, N>& code) {
         static_assert(N != N,
-            "emit() is not supported on this compiler. "
-            "MSVC does not support inline assembly for x64. "
-            "Use Clang or GCC instead.");
+            "core::emit requires GCC or Clang targeting x86 or x86-64.");
     }
 
     template<typename T>
         requires(!FixedByteArray<T>)
     inline void emit([[maybe_unused]] T value) {
         static_assert(sizeof(T) == 0,
-            "emit() is not supported on this compiler. "
-            "MSVC does not support inline assembly for x64. "
-            "Use Clang or GCC instead.");
+            "core::emit requires GCC or Clang targeting x86 or x86-64.");
     }
 
 #endif
