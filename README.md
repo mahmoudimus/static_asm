@@ -302,6 +302,23 @@ constexpr auto code = build([](asm_block<>& b) {
 // lea rax,[rip+1] points exactly at the embedded qword.
 ```
 
+Typed label helpers are available as sugar over `put_rip`, and `put_rip` takes
+an optional immediate-tail length for RIP-relative instructions that end in an
+immediate:
+
+```cpp
+build([](asm_block<>& b) {
+    auto data = b.label();
+    b.lea(rax, data);                              // lea rax,[rip+data]
+    b.mov(ecx, data);                              // mov ecx,[rip+data]  (load)
+    b.mov(data, rbx);                              // mov [rip+data],rbx  (store)
+    b.put_rip(mov(dword_ptr(rip + 0), 0x7B), data, 4);  // disp32 before the imm32
+    b.put(ret());
+    b.bind(data);
+    b.dq(0);
+});
+```
+
 ### Conditional Moves
 
 ```cpp
@@ -531,7 +548,7 @@ Note: The `core::emit()` inline assembly feature requires Clang with -O2 optimiz
 | System | SYSCALL, SYSENTER, SYSEXIT, INT, INT3, IRET/D/Q, CLI, STI, HLT, CPUID, RDTSC, RDTSCP |
 | Misc | NOP, UD2 |
 | Prefixes | LOCK (`lock_`), REP/REPE/REPNE (string ops) |
-| Assembler layer | `asm_block` + `build()`: labels, branch relaxation (rel8/rel32), patch offsets, `db`/`dw`/`dd`/`dq` data, RIP-relative label refs (`put_rip`) |
+| Assembler layer | `asm_block` + `build()`: labels, branch relaxation (rel8/rel32), patch offsets, `db`/`dw`/`dd`/`dq` data, RIP-relative label refs (`put_rip` + typed `lea`/`mov` helpers) |
 
 **Operand support:**
 - All 8/16/32/64-bit general purpose registers (AL-R15)
@@ -546,15 +563,11 @@ Note: The `core::emit()` inline assembly feature requires Clang with -O2 optimiz
 
 ## Roadmap / What's Left
 
-Known gaps, roughly in priority order:
+Known gaps:
 
-- **`asm_block` typed helpers.** The block wraps raw instruction arrays
-  (`put`), branch-to-label (`jmp`/`jcc`/`call`), data (`db`/`dw`/`dd`/`dq`) and
-  RIP-relative label references (`put_rip`). It does not yet offer per-mnemonic
-  typed helpers that take a label directly for every instruction.
-- **`put_rip` with a trailing immediate.** `put_rip` patches the last four bytes
-  of an instruction, so a RIP-relative form that ends in an immediate (e.g.
-  `mov(dword_ptr(rip + 0), imm)`) is not supported via a label yet.
+- **`asm_block` typed helpers beyond `lea`/`mov`.** Labels can be referenced
+  from any instruction via `put_rip`; named sugar currently exists for `lea`
+  and `mov` (load/store). Other mnemonics use `put_rip` directly.
 - **No SIMD/AVX/VEX/EVEX**, x87, or segment-override prefixes.
 
 ## Developing
