@@ -1043,6 +1043,99 @@ namespace static_asm::x86 {
         }
     }
 
+    // MUL/IMUL/DIV/IDIV on a SIB memory operand, e.g. mul qword [rcx + 0x20].
+    // The F6/F7 group extension (4=MUL, 5=IMUL, 6=DIV, 7=IDIV) goes in the
+    // ModR/M reg field; mirrors the SIB encode_unary overload.
+    template<e_instruction_id Id, typename Op1>
+        requires SIBMemory<Op1>
+    inline constexpr auto encode_muldiv([[maybe_unused]] instruction_desc desc, const Op1& op1) {
+        auto opcode = desc.primary_opcode();
+        auto ext = desc.secondary_opcode();
+        if constexpr (Op1::size == 8) {
+            opcode = static_cast<std::uint8_t>(opcode - 1); // F7->F6
+        }
+
+        constexpr e_displacement_type dt = Op1::disp_type;
+        constexpr bool forced_disp8 = sib_needs_forced_disp8<Op1>();
+
+        e_mod mod = e_mod::register_indirect_addressing; // mod=00
+        if constexpr (dt == e_displacement_type::disp8 || forced_disp8) {
+            mod = e_mod::one_byte_signed_displacement; // mod=01
+        } else if constexpr (dt == e_displacement_type::disp32) {
+            mod = e_mod::four_byte_signed_displacement; // mod=10
+        }
+
+        std::uint8_t modrm = static_cast<std::uint8_t>((static_cast<std::uint8_t>(mod) << 6) | ((ext & 0b111) << 3) | 0b100);
+        std::uint8_t sib = encode_sib(op1);
+
+        constexpr bool rex_w = (Op1::size >= 64);
+        constexpr bool rex_x = needs_rex_x<typename Op1::index_type>();
+        constexpr bool rex_b = needs_rex_b_sib<typename Op1::base_type>();
+        constexpr bool need_rex = rex_w || rex_x || rex_b;
+        constexpr bool need_16bit_prefix = (Op1::size == 16);
+
+        constexpr std::size_t disp_size = (dt == e_displacement_type::disp8 || forced_disp8) ? 1u : (dt == e_displacement_type::disp32 ? 4u : 0u);
+
+        constexpr std::size_t total_size = need_16bit_prefix + need_rex + 1 /*opcode*/ + 1 /*modrm*/ + 1 /*sib*/ + disp_size;
+        std::array<std::uint8_t, total_size> result{};
+        std::size_t i = 0;
+
+        if constexpr (need_16bit_prefix) {
+            result[i++] = 0x66;
+        }
+        if constexpr (need_rex) {
+            result[i++] = static_cast<std::uint8_t>((0b0100 << 4) | (rex_w << 3) | (0 << 2) | (rex_x << 1) | rex_b);
+        }
+        result[i++] = opcode;
+        result[i++] = modrm;
+        result[i++] = sib;
+
+        if constexpr (disp_size == 1) {
+            result[i++] = static_cast<std::uint8_t>(op1.displacement());
+        } else if constexpr (disp_size == 4) {
+            auto disp = op1.displacement();
+            result[i++] = static_cast<std::uint8_t>(disp);
+            result[i++] = static_cast<std::uint8_t>(disp >> 8);
+            result[i++] = static_cast<std::uint8_t>(disp >> 16);
+            result[i++] = static_cast<std::uint8_t>(disp >> 24);
+        }
+
+        return result;
+    }
+
+    // MUL/IMUL/DIV/IDIV on a plain register-indirect memory operand, e.g.
+    // mul qword [rcx]. (RSP/R12 or RBP/R13 bases need the `reg + disp` form.)
+    template<e_instruction_id Id, typename Op1>
+        requires Memory<Op1> && Register<typename Op1::value_type>
+    inline constexpr auto encode_muldiv([[maybe_unused]] instruction_desc desc, [[maybe_unused]] const Op1& op1) {
+        auto opcode = desc.primary_opcode();
+        auto ext = desc.secondary_opcode();
+        if constexpr (Op1::size == 8) {
+            opcode = static_cast<std::uint8_t>(opcode - 1);
+        }
+
+        using Base = typename Op1::value_type;
+        std::uint8_t modrm = static_cast<std::uint8_t>((static_cast<std::uint8_t>(e_mod::register_indirect_addressing) << 6) | ((ext & 0b111) << 3) | (static_cast<std::uint8_t>(Base::id()) & 0b111));
+
+        constexpr bool rex_w = (Op1::size >= 64);
+        constexpr bool rex_b = Base::extended;
+        constexpr bool need_rex = rex_w || rex_b;
+        constexpr bool need_16bit_prefix = (Op1::size == 16);
+
+        constexpr std::size_t total_size = need_16bit_prefix + need_rex + 1 + 1;
+        std::array<std::uint8_t, total_size> result{};
+        std::size_t i = 0;
+        if constexpr (need_16bit_prefix) {
+            result[i++] = 0x66;
+        }
+        if constexpr (need_rex) {
+            result[i++] = static_cast<std::uint8_t>((0b0100 << 4) | (rex_w << 3) | (0 << 2) | (0 << 1) | rex_b);
+        }
+        result[i++] = opcode;
+        result[i++] = modrm;
+        return result;
+    }
+
     // Shift/rotate instructions: SHL, SHR, SAL, SAR, ROL, ROR, RCL, RCR
     // Three forms:
     // 1. r/m, 1      - shift by 1 (D0/D1 opcode)

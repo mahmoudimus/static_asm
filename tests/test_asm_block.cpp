@@ -37,6 +37,15 @@ TEST(MemoryBaseDisp, ComposesWithExistingInstructions) {
     EXPECT_EQ(mov(rax, qword_ptr(rbp - std::int8_t(0x8))), (internal::make_array<std::uint8_t>(0x48, 0x8B, 0x44, 0x25, 0xF8)));
 }
 
+TEST(MemoryBaseDisp, MulDivGroup) {
+    EXPECT_EQ(mul(qword_ptr(rcx)), (internal::make_array<std::uint8_t>(0x48, 0xF7, 0x21)));
+    EXPECT_EQ(mul(qword_ptr(rcx + std::int8_t(0x20))), (internal::make_array<std::uint8_t>(0x48, 0xF7, 0x64, 0x21, 0x20)));
+    EXPECT_EQ(imul(qword_ptr(rcx + std::int8_t(0x20))), (internal::make_array<std::uint8_t>(0x48, 0xF7, 0x6C, 0x21, 0x20)));
+    EXPECT_EQ(div(dword_ptr(rax + std::int8_t(0x10))), (internal::make_array<std::uint8_t>(0xF7, 0x74, 0x20, 0x10)));
+    EXPECT_EQ(idiv(qword_ptr(r8 + std::int8_t(0x8))), (internal::make_array<std::uint8_t>(0x49, 0xF7, 0x7C, 0x20, 0x08)));
+    EXPECT_EQ(div(qword_ptr(rcx + 0x12345678)), (internal::make_array<std::uint8_t>(0x48, 0xF7, 0xB4, 0x21, 0x78, 0x56, 0x34, 0x12)));
+}
+
 TEST(MemoryBaseDisp, LockIncQwordMem) {
     // The end-to-end target: lock inc qword [rcx+0x20]
     EXPECT_EQ(lock_(inc(qword_ptr(rcx + std::int8_t(0x20)))),
