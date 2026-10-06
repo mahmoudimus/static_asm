@@ -578,12 +578,13 @@ byte arrays, but cannot place x86 bytes in their instruction stream.
 
 Known gaps:
 
-- **`asm_block` typed helpers beyond `lea`/`mov`.** `put_rip` patches an already
+- **RIP-relative memory label helpers beyond `lea`/`mov`.** `put_rip` patches an already
   encoded RIP-relative instruction; it does not add missing encoder forms.
   Current RIP-relative memory support covers MOV, LEA, XCHG, ALU, unary
   INC/DEC/NEG/NOT, and MUL/IMUL/DIV/IDIV. For example, `test(rax,
-  qword_ptr(rip + 0))` is not yet supported. Named label helpers currently
-  exist for `lea` and `mov` (load/store); other supported forms use `put_rip`.
+  qword_ptr(rip + 0))` is not yet supported. Named RIP-relative memory label
+  helpers currently exist for `lea` and `mov` (load/store); other supported
+  forms use `put_rip`.
 - **No SIMD/AVX/VEX/EVEX**, x87, or segment-override prefixes.
 
 ## Developing
