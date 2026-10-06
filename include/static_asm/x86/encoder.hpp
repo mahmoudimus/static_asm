@@ -552,6 +552,64 @@ namespace static_asm::x86 {
         return result;
     }
 
+    // Immediate byte count for a memory destination of the given operand size:
+    // 8-bit -> 1, 16-bit -> 2, 32/64-bit -> 4 (a 64-bit destination takes a
+    // sign-extended imm32, matching the non-SIB encoders).
+    inline constexpr std::size_t mem_imm_size(std::size_t operand_size) {
+        return operand_size == 8 ? 1u : (operand_size == 16 ? 2u : 4u);
+    }
+
+    // REX byte for a memory operand with no register in the reg field (reg field
+    // is an opcode extension). REX.W from operand size, REX.X/B from index/base.
+    template<typename SIBMem>
+        requires SIBMemory<SIBMem>
+    inline constexpr bool need_rex_mem_ext() {
+        return (SIBMem::size >= 64) || needs_rex_x<typename SIBMem::index_type>() || needs_rex_b_sib<typename SIBMem::base_type>();
+    }
+    template<typename SIBMem>
+        requires SIBMemory<SIBMem>
+    inline constexpr std::uint8_t encode_rex_mem_ext() {
+        constexpr bool w = (SIBMem::size >= 64);
+        constexpr bool x = needs_rex_x<typename SIBMem::index_type>();
+        constexpr bool b = needs_rex_b_sib<typename SIBMem::base_type>();
+        return static_cast<std::uint8_t>((0b0100 << 4) | (w << 3) | (x << 1) | b);
+    }
+
+    // SIB Encoding for MOV: mov [base + index*scale + disp], imm
+    template<e_instruction_id Id, typename Op1, typename Op2>
+        requires SIBMemory<Op1> && Immediate<Op2>
+    inline constexpr auto encode_mov_sib([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
+        std::uint8_t opcode = Op1::size == 8 ? 0xC6 : 0xC7; // /0
+
+        constexpr bool need_rex = need_rex_mem_ext<Op1>();
+        constexpr bool need_16bit_prefix = Op1::size == 16;
+        constexpr std::size_t imm_size = mem_imm_size(Op1::size);
+
+        constexpr std::size_t total_size = need_16bit_prefix + need_rex + 1 + mem_tail_size<Op1>() + imm_size;
+        std::array<std::uint8_t, total_size> result{};
+        std::size_t i = 0;
+
+        if constexpr (need_16bit_prefix) {
+            result[i++] = 0x66;
+        }
+        if constexpr (need_rex) {
+            result[i++] = encode_rex_mem_ext<Op1>();
+        }
+        result[i++] = opcode;
+        write_mem_tail<Op1>(0 /* /0 */, op1, result.data(), i);
+        auto value = static_cast<std::uint64_t>(op2.value());
+        for (std::size_t k = 0; k < imm_size; ++k) {
+            result[i++] = static_cast<std::uint8_t>((value >> (8 * k)) & 0xFF);
+        }
+        return result;
+    }
+
+    template<e_instruction_id Id, typename Op1, typename Op2>
+        requires SIBMemory<Op1> && Integer<Op2>
+    inline constexpr auto encode_mov_sib([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
+        return encode_mov_sib<Id>(desc, op1, immediate<std::uint32_t>(static_cast<std::uint32_t>(op2)));
+    }
+
     // =========================================================================
     // SIB Encoding for ALU: add/sub/and/or/xor/cmp reg, [base + index*scale + disp]
     // =========================================================================
@@ -607,6 +665,45 @@ namespace static_asm::x86 {
         result[i++] = opcode;
         write_mem_tail<Op1>(static_cast<std::uint8_t>(Op2::id()), op1, result.data(), i);
         return result;
+    }
+
+    // ALU with SIB memory as destination and an immediate source.
+    template<e_instruction_id Id, typename Op1, typename Op2>
+        requires SIBMemory<Op1> && Immediate<Op2>
+    inline constexpr auto encode_alu_sib([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
+        // 80 /ext ib for 8-bit, 81 /ext iz otherwise (full-width immediate,
+        // matching the non-SIB ALU encoder; the short 83 /ext ib form is not
+        // used).
+        std::uint8_t opcode = Op1::size == 8 ? 0x80 : 0x81;
+        std::uint8_t ext = static_cast<std::uint8_t>(opcodeext_alu(desc.id()));
+
+        constexpr bool need_rex = need_rex_mem_ext<Op1>();
+        constexpr bool need_16bit_prefix = Op1::size == 16;
+        constexpr std::size_t imm_size = mem_imm_size(Op1::size);
+
+        constexpr std::size_t total_size = need_16bit_prefix + need_rex + 1 + mem_tail_size<Op1>() + imm_size;
+        std::array<std::uint8_t, total_size> result{};
+        std::size_t i = 0;
+
+        if constexpr (need_16bit_prefix) {
+            result[i++] = 0x66;
+        }
+        if constexpr (need_rex) {
+            result[i++] = encode_rex_mem_ext<Op1>();
+        }
+        result[i++] = opcode;
+        write_mem_tail<Op1>(ext, op1, result.data(), i);
+        auto value = static_cast<std::uint64_t>(op2.value());
+        for (std::size_t k = 0; k < imm_size; ++k) {
+            result[i++] = static_cast<std::uint8_t>((value >> (8 * k)) & 0xFF);
+        }
+        return result;
+    }
+
+    template<e_instruction_id Id, typename Op1, typename Op2>
+        requires SIBMemory<Op1> && Integer<Op2>
+    inline constexpr auto encode_alu_sib([[maybe_unused]] instruction_desc desc, Op1 op1, Op2 op2) {
+        return encode_alu_sib<Id>(desc, op1, immediate<std::uint32_t>(static_cast<std::uint32_t>(op2)));
     }
 
     // =========================================================================
