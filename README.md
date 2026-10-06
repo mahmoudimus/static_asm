@@ -65,7 +65,7 @@ sub(dword_ptr(rsp + disp<0x20>), eax);           // 29 44 24 20
 > still need a zero `disp8`. Values outside signed 32 bits fail compilation.
 > A plain integer such as `rcx + 0x10` still uses `disp32`: C++ cannot select
 > different exact-size instruction array types from the value of an `int`
-> argument. An explicit `std::int8_t(0x10)` also selects `disp8`.
+> argument.
 > `[base + disp]` with a general base uses the canonical ModR/M-only form (no
 > SIB byte); RSP/R12 bases emit a SIB byte because the hardware requires it.
 
@@ -83,9 +83,9 @@ mov(eax, 0xDEADBEEF);    // B8 EF BE AD DE
 
 // Memory operations
 mov(rax, qword_ptr(rbx));                        // 48 8B 03
-mov(eax, dword_ptr(rcx + std::int8_t(0x10)));    // 8B 41 10
-mov(rax, qword_ptr(rbp - std::int8_t(0x20)));    // 48 8B 45 E0 (canonical, no SIB)
-mov(qword_ptr(rsp + std::int8_t(0x8)), rax);     // 48 89 44 24 08 (RSP base needs SIB)
+mov(eax, dword_ptr(rcx + disp<0x10>));           // 8B 41 10
+mov(rax, qword_ptr(rbp - disp<0x20>));           // 48 8B 45 E0 (canonical, no SIB)
+mov(qword_ptr(rsp + disp<0x8>), rax);            // 48 89 44 24 08 (RSP base needs SIB)
 
 // Zero/sign extension
 movzx(eax, bl);          // 0F B6 C3 (zero-extend byte to dword)
@@ -96,17 +96,17 @@ movsxd(rax, ecx);        // 48 63 C1 (sign-extend dword to qword)
 
 // Load effective address
 lea(rax, qword_ptr(rbx + rcx * s4));                      // 48 8D 04 8B
-lea(rax, qword_ptr(rbx + rcx * s8 + std::int8_t(0x10)));  // 48 8D 44 CB 10
+lea(rax, qword_ptr(rbx + rcx * s8 + disp<0x10>));         // 48 8D 44 CB 10
 
 // Exchange (register or memory; XCHG is symmetric)
 xchg(rax, rbx);                                  // 48 87 D8
 xchg(qword_ptr(rcx), rax);                       // 48 87 01
-xchg(rbx, qword_ptr(rcx + std::int8_t(0x10)));   // 48 87 59 10
+xchg(rbx, qword_ptr(rcx + disp<0x10>));          // 48 87 59 10
 
 // Store an immediate to a displaced / SIB / RIP memory destination
-mov(dword_ptr(rbp - std::int8_t(0x20)), 0x100);  // C7 45 E0 00 01 00 00
-mov(qword_ptr(rcx + std::int8_t(0x10)), 1);      // 48 C7 41 10 01 00 00 00
-add(qword_ptr(rbx + std::int8_t(0x8)), 0x10);    // 48 81 43 08 10 00 00 00
+mov(dword_ptr(rbp - disp<0x20>), 0x100);         // C7 45 E0 00 01 00 00
+mov(qword_ptr(rcx + disp<0x10>), 1);             // 48 C7 41 10 01 00 00 00
+add(qword_ptr(rbx + disp<0x8>), 0x10);           // 48 81 43 08 10 00 00 00
 ```
 
 A qword memory destination has only a sign-extended 32-bit immediate encoding.
@@ -138,12 +138,12 @@ mov(eax, dword_ptr(rbx + rcx * s4));   // 8B 04 8B
 mov(eax, dword_ptr(rbx + rcx * s8));   // 8B 04 CB
 
 // [base + index*scale + displacement]
-mov(rax, qword_ptr(rbx + rcx * s4 + std::int8_t(0x10)));  // 48 8B 44 8B 10
+mov(rax, qword_ptr(rbx + rcx * s4 + disp<0x10>));         // 48 8B 44 8B 10
 mov(rax, qword_ptr(r12 + r13 * s8 + 0x1000));             // 4B 8B 84 EC 00 10 00 00
 
 // Store to SIB address
 mov(dword_ptr(rax + rdx * s4), ecx);                      // 89 0C 90
-mov(qword_ptr(rbx + rsi * s8 + std::int8_t(0x20)), rax);  // 48 89 44 F3 20
+mov(qword_ptr(rbx + rsi * s8 + disp<0x20>), rax);         // 48 89 44 F3 20
 
 // LEA with SIB (useful for address calculations)
 lea(rax, qword_ptr(rbx + rcx * s4));                      // 48 8D 04 8B
@@ -193,8 +193,8 @@ imul(ecx, edx, 1000);    // 69 CA E8 03 00 00
 
 // Single-operand form with a memory operand
 mul(qword_ptr(rcx));                             // 48 F7 21
-imul(qword_ptr(rcx + std::int8_t(0x20)));        // 48 F7 69 20
-div(dword_ptr(rax + std::int8_t(0x10)));         // F7 70 10
+imul(qword_ptr(rcx + disp<0x20>));               // 48 F7 69 20
+div(dword_ptr(rax + disp<0x10>));                // F7 70 10
 idiv(qword_ptr(rbx));                            // 48 F7 3B
 ```
 
@@ -209,10 +209,10 @@ not_(rdx);               // 48 F7 D2
 
 // Memory operands (canonical ModR/M-only addressing)
 inc(qword_ptr(rcx));                             // 48 FF 01
-inc(qword_ptr(rcx + std::int8_t(0x20)));         // 48 FF 41 20
-dec(dword_ptr(rax + std::int8_t(0x10)));         // FF 48 10
+inc(qword_ptr(rcx + disp<0x20>));                // 48 FF 41 20
+dec(dword_ptr(rax + disp<0x10>));                // FF 48 10
 neg(qword_ptr(rbx));                             // 48 F7 1B
-not_(qword_ptr(rbx - std::int8_t(0x4)));         // 48 F7 53 FC
+not_(qword_ptr(rbx - disp<0x4>));                // 48 F7 53 FC
 ```
 
 ### LOCK Prefix
@@ -221,7 +221,7 @@ not_(qword_ptr(rbx - std::int8_t(0x4)));         // 48 F7 53 FC
 read-modify-write on memory atomic:
 
 ```cpp
-lock_(inc(qword_ptr(rcx + std::int8_t(0x20))));  // F0 48 FF 41 20
+lock_(inc(qword_ptr(rcx + disp<0x20>)));         // F0 48 FF 41 20
 lock_(add(dword_ptr(rax), ecx));                 // F0 01 08
 ```
 
