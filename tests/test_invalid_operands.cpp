@@ -3,9 +3,10 @@
 using namespace static_asm::x86;
 using namespace static_asm::x86::instructions;
 using namespace static_asm::x86::registers;
+using static_asm::core::assemble;
 
 #ifndef STATIC_ASM_INVALID_CASE
-#error STATIC_ASM_INVALID_CASE must be defined
+    #error STATIC_ASM_INVALID_CASE must be defined
 #endif
 
 #if STATIC_ASM_INVALID_CASE == 0
@@ -13,6 +14,9 @@ constexpr auto valid = mov(qword_ptr(rbx + std::int8_t(0)), 1);
 static_assert(valid.size() == 8);
 constexpr auto valid_constant = mov(qword_ptr(rbx + disp<0>), 1);
 static_assert(valid_constant.size() == 7);
+constexpr auto valid_label = label<"valid_label">;
+constexpr auto valid_symbolic = assemble(valid_label.assemble(jne(valid_label)));
+static_assert(valid_symbolic.size() == 2);
 #elif STATIC_ASM_INVALID_CASE == 1
 constexpr auto invalid = mov(eax, dword_ptr(rip + rcx * s4 + 16));
 #elif STATIC_ASM_INVALID_CASE == 2
@@ -24,12 +28,8 @@ constexpr auto invalid = xchg(eax, qword_ptr(rcx + std::int8_t(0)));
 #elif STATIC_ASM_INVALID_CASE == 5
 constexpr auto invalid = xchg(qword_ptr(rcx), eax);
 #elif STATIC_ASM_INVALID_CASE == 6
-constexpr auto invalid = build([](asm_block<>& b) {
-    auto target = b.label();
-    b.lea(al, target);
-    b.bind(target);
-    b.db(0);
-});
+constexpr auto target = label<"invalid_lea_target">;
+constexpr auto invalid = assemble(lea(al, qword_ptr(target)), target.assemble(db(0)));
 #elif STATIC_ASM_INVALID_CASE == 7
 constexpr auto invalid = mov(qword_ptr(rbx + std::int8_t(0)), 0x100000000ULL);
 #elif STATIC_ASM_INVALID_CASE == 8
@@ -50,6 +50,12 @@ constexpr auto invalid = mov(eax, dword_ptr(rbx + disp<0x80000000LL>));
 constexpr auto invalid = mov(eax, dword_ptr(rbx - disp<-0x80000000LL>));
 #elif STATIC_ASM_INVALID_CASE == 16
 constexpr auto invalid = mov(eax, dword_ptr(rbx + disp<1> + disp<2>));
+#elif STATIC_ASM_INVALID_CASE == 17
+constexpr auto missing = label<"missing">;
+constexpr auto invalid = assemble(jmp(missing));
+#elif STATIC_ASM_INVALID_CASE == 18
+constexpr auto duplicate = label<"duplicate">;
+constexpr auto invalid = assemble(duplicate.assemble(nop()), duplicate.assemble(ret()));
 #else
-#error Unknown invalid operand case
+    #error Unknown invalid operand case
 #endif

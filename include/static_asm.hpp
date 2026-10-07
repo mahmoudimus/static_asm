@@ -8,7 +8,6 @@
 #include "static_asm/core.hpp"
 
 // x86 architecture
-#include "static_asm/x86/asm_block.hpp"
 #include "static_asm/x86/encoder.hpp"
 #include "static_asm/x86/gen/instruction.g.hpp"
 #include "static_asm/x86/gen/instruction_db.g.hpp"
@@ -18,5 +17,6 @@
 #include "static_asm/x86/operands.hpp"
 #include "static_asm/x86/rex.hpp"
 #include "static_asm/x86/sib.hpp"
+#include "static_asm/x86/symbolic.hpp"
 
 #endif // STATIC_ASM_HPP

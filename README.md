@@ -256,79 +256,79 @@ ret();                   // C3
 ret(0x10);               // C2 10 00 (return and pop 16 bytes)
 ```
 
-### Labels and Branch Relaxation (`asm_block`)
+### Labels and Branch Relaxation
 
-The jump helpers above take a literal displacement you compute yourself.
-`asm_block` adds a compile-time assembler layer that resolves branches to
-**labels** and picks the smallest encoding (rel8 when the target is within
-+/-127, rel32 otherwise) via iterative relaxation — so the output matches
-hand-written/standard-assembler bytes.
+A named label groups the bytes that begin at its location. Pass the resulting
+fragment to `core::assemble()` alongside ordinary encoded instructions. The
+outer call resolves label references and chooses rel8 or rel32 for each branch.
 
 ```cpp
-using namespace static_asm::x86;
-
-constexpr auto code = build([](asm_block<>& b) {
-    auto loop = b.label();
-    b.bind(loop);
-    b.put(dec(ecx));     // any encoded instruction array
-    b.jne(loop);         // -> 75 FC : rel8 displacement computed for you
-});
+constexpr auto loop = label<"loop">;
+constexpr auto code = core::assemble(
+    loop.assemble(
+        dec(ecx),
+        jne(loop)
+    )
+);
 // code == { FF, C9, 75, FC }
 ```
 
-`build()` computes the final size from the block itself, so the array length is
-never written by hand. Labels also expose their final byte offset via
-`offset_of()`, which gives exact runtime patch sites:
+`loop.assemble(...)` creates a symbolic fragment. It does not finalize bytes;
+references across fragments need the complete layout. The outer
+`core::assemble()` returns an exact-size compile-time code object with the
+same `size()`, indexing, and byte-array comparison behavior as an array.
+`offset_of(label)` gives a final byte offset for runtime patch sites:
 
 ```cpp
-constexpr std::size_t imm_slot = [] {
-    asm_block<> b;
-    auto ctx = b.label();
-    b.put(nop());            // leading code
-    b.bind(ctx);
-    b.put(movabs(rax, 0));   // 48 B8 + imm64 placeholder
-    return b.offset_of(ctx) + 2;   // skip 48 B8 -> imm64 starts here
-}();   // imm_slot == 3
+constexpr auto ctx = label<"ctx">;
+constexpr auto code = core::assemble(
+    nop(),
+    ctx.assemble(movabs(rax, 0))
+);
+constexpr std::size_t imm_slot = code.offset_of(ctx) + 2; // 3
 ```
 
-Labels are handles (`b.label()` / `b.bind()` / `b.jne(label)`), not strings.
-`call` to a label is always rel32 (it has no short form). The block has a fixed
-capacity for heap-free `constexpr` use: `asm_block<BytePool, MaxFrag, MaxLabel>`,
-with generous defaults — raise them for larger programs.
-
-**Data directives and RIP-relative label references.** `db`/`dw`/`dd`/`dq` emit
-raw little-endian data into the block, and `put_rip` appends a RIP-relative
-instruction (built with a `rip + 0` placeholder) whose `disp32` is resolved to a
-label — together giving position-independent data access:
+Forward references work across fragments. Branch relaxation repeats until
+every branch width is stable; `call(label)` always uses rel32.
 
 ```cpp
-constexpr auto code = build([](asm_block<>& b) {
-    auto data = b.label();
-    b.put_rip(lea(rax, qword_ptr(rip + 0)), data);  // lea rax,[rip+data]
-    b.put(ret());
-    b.bind(data);
-    b.dq(0xCAFEBABE);
-});
+constexpr auto done = label<"done">;
+constexpr auto code = core::assemble(
+    jmp(done),
+    nop(),
+    done.assemble(ret())
+);
+// EB 01 90 C3
+```
+
+`db`/`dw`/`dd`/`dq` produce raw little-endian byte arrays. Passing a
+label to a sized memory helper creates a RIP-relative reference to that label:
+
+```cpp
+constexpr auto data = label<"data">;
+constexpr auto code = core::assemble(
+    lea(rax, qword_ptr(data)),
+    ret(),
+    data.assemble(dq(0xCAFEBABE))
+);
 // 48 8D 05 01 00 00 00  C3  BE BA FE CA 00 00 00 00
-// lea rax,[rip+1] points exactly at the embedded qword.
 ```
 
-Typed label helpers are available as sugar over `put_rip`, and `put_rip` takes
-an optional immediate-tail length for RIP-relative instructions that end in an
-immediate:
+RIP-relative labeled memory also works with MOV, XCHG, ADD/ADC/SUB/SBB/CMP,
+AND/OR/XOR, and unary/multiply/divide memory forms. A trailing immediate needs
+no manual displacement-tail length:
 
 ```cpp
-build([](asm_block<>& b) {
-    auto data = b.label();
-    b.lea(rax, data);                              // lea rax,[rip+data]
-    b.mov(ecx, data);                              // mov ecx,[rip+data]  (load)
-    b.mov(data, rbx);                              // mov [rip+data],rbx  (store)
-    b.put_rip(mov(dword_ptr(rip + 0), 0x7B), data, 4);  // disp32 before the imm32
-    b.put(ret());
-    b.bind(data);
-    b.dq(0);
-});
+constexpr auto data = label<"counter">;
+constexpr auto code = core::assemble(
+    mov(dword_ptr(data), 0x7B),
+    ret(),
+    data.assemble(dd(0))
+);
 ```
+
+Each referenced label needs exactly one `label.assemble(...)` definition.
+Missing or duplicate definitions fail at compile time.
 
 ### Conditional Moves
 
@@ -561,7 +561,7 @@ byte arrays, but cannot place x86 bytes in their instruction stream.
 | System | SYSCALL, SYSENTER, SYSEXIT, INT, INT3, IRET/D/Q, CLI, STI, HLT, CPUID, RDTSC, RDTSCP |
 | Misc | NOP, UD2 |
 | Prefixes | LOCK (`lock_`), REP/REPE/REPNE (string ops) |
-| Assembler layer | `asm_block` + `build()`: labels, branch relaxation (rel8/rel32), patch offsets, `db`/`dw`/`dd`/`dq` data, RIP-relative label refs (`put_rip` + typed `lea`/`mov` helpers) |
+| Assembler layer | `label<"name">`, `label.assemble(...)`, and `core::assemble(...)`: branch relaxation (rel8/rel32), patch offsets, `db`/`dw`/`dd`/`dq` data, and RIP-relative labeled memory operands |
 
 **Operand support:**
 - All 8/16/32/64-bit general purpose registers (AL-R15)
@@ -578,13 +578,11 @@ byte arrays, but cannot place x86 bytes in their instruction stream.
 
 Known gaps:
 
-- **RIP-relative memory label helpers beyond `lea`/`mov`.** `put_rip` patches an already
-  encoded RIP-relative instruction; it does not add missing encoder forms.
-  Current RIP-relative memory support covers MOV, LEA, XCHG, ALU, unary
-  INC/DEC/NEG/NOT, and MUL/IMUL/DIV/IDIV. For example, `test(rax,
-  qword_ptr(rip + 0))` is not yet supported. Named RIP-relative memory label
-  helpers currently exist for `lea` and `mov` (load/store); other supported
-  forms use `put_rip`.
+- **RIP-relative memory encoder coverage.** Labeled memory operands use the
+  same encoder forms as literal RIP-relative memory. MOV, LEA, XCHG,
+  ADD/ADC/SUB/SBB/CMP, AND/OR/XOR, INC/DEC/NEG/NOT, and MUL/IMUL/DIV/IDIV
+  have labeled forms. For example, `test(rax, qword_ptr(data))` is not supported
+  because the underlying `test(rax, qword_ptr(rip + 0))` form is not encoded yet.
 - **No SIMD/AVX/VEX/EVEX**, x87, or segment-override prefixes.
 
 ## Developing
