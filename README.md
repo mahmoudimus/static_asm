@@ -34,6 +34,8 @@ constexpr auto code = core::assemble(
 // code is std::array<uint8_t, N> - fully constexpr!
 ```
 
+For named branches and embedded data, see [Labels and Branch Relaxation](#labels-and-branch-relaxation).
+
 ## Examples by Category
 
 ### ALU Operations
@@ -277,29 +279,54 @@ constexpr auto code = core::assemble(
 references across fragments need the complete layout. The outer
 `core::assemble()` returns an exact-size compile-time code object with the
 same `size()`, indexing, and byte-array comparison behavior as an array.
-`offset_of(label)` gives a final byte offset for runtime patch sites:
+
+Several labels can be passed to one outer call. Each `label.assemble(...)`
+marks the start of its fragment; the parentheses keep the bytes belonging to
+that label together in the source:
+
+```cpp
+constexpr auto loop = label<"loop">;
+constexpr auto done = label<"done">;
+constexpr auto data = label<"data">;
+
+constexpr auto code = core::assemble(
+    mov(ecx, 3),
+
+    loop.assemble(
+        dec(ecx),
+        jne(loop),
+        jmp(done)
+    ),
+
+    data.assemble(
+        dq(42)
+    ),
+
+    done.assemble(
+        lea(rax, qword_ptr(data)),
+        ret()
+    )
+);
+```
+
+All labels share one program layout, even when fragments are nested. The
+closing `)` ends the source grouping; it does not create a control-flow
+boundary. `code.offset_of(label)` gives a final byte offset for runtime patch
+sites:
 
 ```cpp
 constexpr auto ctx = label<"ctx">;
 constexpr auto code = core::assemble(
     nop(),
-    ctx.assemble(movabs(rax, 0))
+    ctx.assemble(
+        movabs(rax, 0)
+    )
 );
 constexpr std::size_t imm_slot = code.offset_of(ctx) + 2; // 3
 ```
 
 Forward references work across fragments. Branch relaxation repeats until
 every branch width is stable; `call(label)` always uses rel32.
-
-```cpp
-constexpr auto done = label<"done">;
-constexpr auto code = core::assemble(
-    jmp(done),
-    nop(),
-    done.assemble(ret())
-);
-// EB 01 90 C3
-```
 
 `db`/`dw`/`dd`/`dq` produce raw little-endian byte arrays. Passing a
 label to a sized memory helper creates a RIP-relative reference to that label:
@@ -309,7 +336,9 @@ constexpr auto data = label<"data">;
 constexpr auto code = core::assemble(
     lea(rax, qword_ptr(data)),
     ret(),
-    data.assemble(dq(0xCAFEBABE))
+    data.assemble(
+        dq(0xCAFEBABE)
+    )
 );
 // 48 8D 05 01 00 00 00  C3  BE BA FE CA 00 00 00 00
 ```
@@ -323,7 +352,9 @@ constexpr auto data = label<"counter">;
 constexpr auto code = core::assemble(
     mov(dword_ptr(data), 0x7B),
     ret(),
-    data.assemble(dd(0))
+    data.assemble(
+        dd(0)
+    )
 );
 ```
 
