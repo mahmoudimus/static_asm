@@ -72,6 +72,32 @@ constexpr auto invalid = test(byte_ptr(rip + 0), 0x100);
 constexpr auto invalid = test(word_ptr(rip + 0), 0x10000);
 #elif STATIC_ASM_INVALID_CASE == 26
 constexpr auto invalid = test(dword_ptr(rip + 0), 0x100000000ULL);
+#elif STATIC_ASM_INVALID_CASE == 27
+constexpr auto invalid = bsf(eax, qword_ptr(rip + 0));
+#elif STATIC_ASM_INVALID_CASE == 28
+constexpr auto invalid = bt(qword_ptr(rip + 0), ecx);
+#elif STATIC_ASM_INVALID_CASE == 29
+constexpr auto invalid = cmovz(eax, qword_ptr(rip + 0));
+#elif STATIC_ASM_INVALID_CASE == 30
+constexpr auto invalid = imul(eax, qword_ptr(rip + 0));
+#elif STATIC_ASM_INVALID_CASE == 31
+constexpr auto invalid = imul(eax, qword_ptr(rip + 0), imm8(1));
+#elif STATIC_ASM_INVALID_CASE == 32
+constexpr auto invalid = movzx(eax, dword_ptr(rip + 0));
+#elif STATIC_ASM_INVALID_CASE == 33
+constexpr auto invalid = movsxd(rax, qword_ptr(rip + 0));
+#elif STATIC_ASM_INVALID_CASE == 34
+constexpr auto invalid = call(dword_ptr(rip + 0));
+#elif STATIC_ASM_INVALID_CASE == 35
+constexpr auto invalid = jmp(dword_ptr(rip + 0));
+#elif STATIC_ASM_INVALID_CASE == 36
+constexpr auto invalid = push(dword_ptr(rip + 0));
+#elif STATIC_ASM_INVALID_CASE == 37
+constexpr auto invalid = pop(dword_ptr(rip + 0));
+#elif STATIC_ASM_INVALID_CASE == 38
+constexpr auto invalid = imul(rax, qword_ptr(rip + 0), imm16(1));
+#elif STATIC_ASM_INVALID_CASE == 39
+constexpr auto invalid = imul(rax, qword_ptr(rip + 0), 0x100000000ULL);
 #else
     #error Unknown invalid operand case
 #endif

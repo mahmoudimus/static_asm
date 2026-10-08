@@ -345,8 +345,36 @@ constexpr auto code = core::assemble(
 // 48 8D 05 01 00 00 00  C3  BE BA FE CA 00 00 00 00
 ```
 
-RIP-relative labeled memory also works with MOV, XCHG, TEST,
-ADD/ADC/SUB/SBB/CMP, AND/OR/XOR, and unary/multiply/divide memory forms.
+RIP-relative labeled memory works for every currently exposed scalar instruction
+family with an explicit memory operand. Literal `rip + displacement` addresses
+use the same encoders. The supported forms are:
+
+| Family | Labeled memory form |
+| --- | --- |
+| MOV, LEA, XCHG, TEST; ADD/ADC/SUB/SBB/CMP, AND/OR/XOR | Register/memory and memory/immediate forms where the instruction permits them |
+| INC/DEC/NEG/NOT; MUL/IMUL/DIV/IDIV | Unary memory form |
+| BSF/BSR; CMOVcc; MOVZX/MOVSX/MOVSXD | Register destination, memory source |
+| BT/BTC/BTR/BTS | Memory destination, register or imm8 bit index |
+| IMUL | Two-operand register/memory and three-operand register/memory/immediate forms |
+| SHL/SHR/SAL/SAR/ROL/ROR/RCL/RCR | Memory destination, implicit count 1, CL, or imm8 |
+| CALL/JMP | Indirect near branch through a qword memory operand |
+| PUSH/POP | Word or qword memory operand |
+
+For example, the previously missing bit-scan and conditional-move forms now
+resolve a data label in the same `core::assemble()` call:
+
+```cpp
+constexpr auto data = label<"word">;
+constexpr auto code = core::assemble(
+    bsf(rax, qword_ptr(data)),
+    cmovz(r8, qword_ptr(data)),
+    data.assemble(dq(42))
+);
+```
+
+Register-only instructions, relative branches, and the `nop<Len>()` padding
+API do not take an explicit memory address in this interface.
+
 A trailing immediate needs no manual displacement-tail length:
 
 ```cpp
@@ -363,6 +391,11 @@ constexpr auto code = core::assemble(
 
 Each referenced label needs exactly one `label.assemble(...)` definition.
 Missing or duplicate definitions fail at compile time.
+
+`call(label)` and `jmp(label)` branch directly to code at the label.
+`call(qword_ptr(label))` and `jmp(qword_ptr(label))` instead load a 64-bit
+target address from memory at the label. These are different machine
+instructions.
 
 ### Conditional Moves
 
@@ -612,11 +645,6 @@ byte arrays, but cannot place x86 bytes in their instruction stream.
 
 Known gaps:
 
-- **RIP-relative memory encoder coverage.** Labeled memory operands use the
-  same encoder forms as literal RIP-relative memory. MOV, LEA, XCHG, TEST,
-  ADD/ADC/SUB/SBB/CMP, AND/OR/XOR, INC/DEC/NEG/NOT, and MUL/IMUL/DIV/IDIV
-  have labeled forms. Other families still lack literal RIP-relative memory
-  encoding; for example, `bsf(rax, qword_ptr(rip + 0))` is not supported yet.
 - **No SIMD/AVX/VEX/EVEX**, x87, or segment-override prefixes.
 
 ## Developing

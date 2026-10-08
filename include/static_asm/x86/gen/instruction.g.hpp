@@ -32,14 +32,14 @@ namespace static_asm::x86::instructions {
 
     // BSF - Bit Scan Forward
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto bsf(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::bsf>(op1, op2);
     }
 
     // BSR - Bit Scan Reverse
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto bsr(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::bsr>(op1, op2);
     }
@@ -82,196 +82,196 @@ namespace static_asm::x86::instructions {
 
     // CMOVA/CMOVNBE - Move if above (CF=0 and ZF=0)
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmova(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmova>(op1, op2);
     }
 
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovnbe(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmova>(op1, op2); // Alias for CMOVA
     }
 
     // CMOVAE/CMOVNB/CMOVNC - Move if above or equal (CF=0)
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovae(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovae>(op1, op2);
     }
 
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovnb(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovae>(op1, op2); // Alias for CMOVAE
     }
 
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovnc(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovae>(op1, op2); // Alias for CMOVAE
     }
 
     // CMOVB/CMOVC/CMOVNAE - Move if below (CF=1)
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovb(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovb>(op1, op2);
     }
 
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovc(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovb>(op1, op2); // Alias for CMOVB
     }
 
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovnae(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovb>(op1, op2); // Alias for CMOVB
     }
 
     // CMOVBE/CMOVNA - Move if below or equal (CF=1 or ZF=1)
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovbe(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovbe>(op1, op2);
     }
 
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovna(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovbe>(op1, op2); // Alias for CMOVBE
     }
 
     // CMOVE/CMOVZ - Move if equal (ZF=1)
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmove(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmove>(op1, op2);
     }
 
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovz(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmove>(op1, op2); // Alias for CMOVE
     }
 
     // CMOVG/CMOVNLE - Move if greater (ZF=0 and SF=OF)
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovg(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovg>(op1, op2);
     }
 
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovnle(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovg>(op1, op2); // Alias for CMOVG
     }
 
     // CMOVGE/CMOVNL - Move if greater or equal (SF=OF)
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovge(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovge>(op1, op2);
     }
 
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovnl(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovge>(op1, op2); // Alias for CMOVGE
     }
 
     // CMOVL/CMOVNGE - Move if less (SF!=OF)
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovl(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovl>(op1, op2);
     }
 
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovnge(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovl>(op1, op2); // Alias for CMOVL
     }
 
     // CMOVLE/CMOVNG - Move if less or equal (ZF=1 or SF!=OF)
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovle(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovle>(op1, op2);
     }
 
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovng(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovle>(op1, op2); // Alias for CMOVLE
     }
 
     // CMOVNE/CMOVNZ - Move if not equal (ZF=0)
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovne(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovnz>(op1, op2);
     }
 
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovnz(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovnz>(op1, op2);
     }
 
     // CMOVNO - Move if not overflow (OF=0)
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovno(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovno>(op1, op2);
     }
 
     // CMOVNP/CMOVPO - Move if not parity (PF=0)
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovnp(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovnp>(op1, op2);
     }
 
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovpo(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovnp>(op1, op2); // Alias for CMOVNP
     }
 
     // CMOVNS - Move if not sign (SF=0)
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovns(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovns>(op1, op2);
     }
 
     // CMOVO - Move if overflow (OF=1)
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovo(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovo>(op1, op2);
     }
 
     // CMOVP/CMOVPE - Move if parity (PF=1)
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovp(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovp>(op1, op2);
     }
 
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovpe(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovp>(op1, op2); // Alias for CMOVP
     }
 
     // CMOVS - Move if sign (SF=1)
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto cmovs(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::cmovs>(op1, op2);
     }
@@ -308,29 +308,33 @@ namespace static_asm::x86::instructions {
 
     // IMUL two-operand form: op1 = op1 * op2
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto imul(const Op1& op1, const Op2& op2) {
         return encode<e_instruction_id::imul_two>(op1, op2);
     }
 
     // IMUL three-operand form: op1 = op2 * op3 (with immediate operand)
     template<typename Op1, typename Op2, typename Op3>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>) && Immediate<Op3>
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>) && Immediate<Op3>
     inline constexpr auto imul(const Op1& op1, const Op2& op2, const Op3& op3) {
         return encode<e_instruction_id::imul_three>(op1, op2, op3);
     }
 
     // IMUL three-operand form with integer literal
     template<typename Op1, typename Op2, typename Op3>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>) && Integer<Op3>
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>) && Integer<Op3>
     inline constexpr auto imul(const Op1& op1, const Op2& op2, const Op3& op3) {
-        auto imm = imm32(static_cast<std::uint32_t>(op3));
-        return encode<e_instruction_id::imul_three>(op1, op2, imm);
+        if constexpr (SIBMemory<Op2>) {
+            return encode<e_instruction_id::imul_three>(op1, op2, op3);
+        } else {
+            auto imm = imm32(static_cast<std::uint32_t>(op3));
+            return encode<e_instruction_id::imul_three>(op1, op2, imm);
+        }
     }
 
     // IMUL three-operand form with imm8 - explicit overload for smaller encoding
     template<typename Op1, typename Op2>
-        requires Register<Op1> && (Register<Op2> || Memory<Op2>)
+        requires Register<Op1> && (Register<Op2> || Memory<Op2> || SIBMemory<Op2>)
     inline constexpr auto imul(const Op1& op1, const Op2& op2, const imm8& op3) {
         return encode<e_instruction_id::imul_three>(op1, op2, op3);
     }
@@ -449,9 +453,9 @@ namespace static_asm::x86::instructions {
     }
 
     template<typename Address>
-        requires(Immediate<Address> || Register<Address> || (Memory<Address> && Register<typename Address::value_type>))
+        requires(Immediate<Address> || Register<Address> || (Memory<Address> && Register<typename Address::value_type>) || SIBMemory<Address>)
     inline constexpr auto jmp(Address address) {
-        return encode<e_instruction_id::jmp>(address);
+        return encode<e_instruction_id::jmp, Address>(address);
     }
 
     template<typename Address>
@@ -1608,14 +1612,14 @@ namespace static_asm::x86::instructions {
 
     // MOVZX with 8-bit memory source
     template<typename Dest, typename Src>
-        requires Register<Dest> && Memory<Src> && (Dest::size >= 16) && (Src::size == 8)
+        requires Register<Dest> && (Memory<Src> || SIBMemory<Src>) && (Dest::size >= 16) && (Src::size == 8)
     inline constexpr auto movzx(const Dest& dest, const Src& src) {
         return encode<e_instruction_id::movzx>(dest, src);
     }
 
     // MOVZX with 16-bit memory source
     template<typename Dest, typename Src>
-        requires Register<Dest> && Memory<Src> && (Dest::size >= 32) && (Src::size == 16)
+        requires Register<Dest> && (Memory<Src> || SIBMemory<Src>) && (Dest::size >= 32) && (Src::size == 16)
     inline constexpr auto movzx(const Dest& dest, const Src& src) {
         return encode<e_instruction_id::movzx>(dest, src);
     }
@@ -1645,14 +1649,14 @@ namespace static_asm::x86::instructions {
 
     // MOVSX with 8-bit memory source
     template<typename Dest, typename Src>
-        requires Register<Dest> && Memory<Src> && (Dest::size >= 16) && (Src::size == 8)
+        requires Register<Dest> && (Memory<Src> || SIBMemory<Src>) && (Dest::size >= 16) && (Src::size == 8)
     inline constexpr auto movsx(const Dest& dest, const Src& src) {
         return encode<e_instruction_id::movsx>(dest, src);
     }
 
     // MOVSX with 16-bit memory source
     template<typename Dest, typename Src>
-        requires Register<Dest> && Memory<Src> && (Dest::size >= 32) && (Src::size == 16)
+        requires Register<Dest> && (Memory<Src> || SIBMemory<Src>) && (Dest::size >= 32) && (Src::size == 16)
     inline constexpr auto movsx(const Dest& dest, const Src& src) {
         return encode<e_instruction_id::movsx>(dest, src);
     }
@@ -1672,7 +1676,7 @@ namespace static_asm::x86::instructions {
 
     // MOVSXD with 32-bit memory source
     template<typename Dest, typename Src>
-        requires Register64<Dest> && Memory<Src> && (Src::size == 32)
+        requires Register64<Dest> && (Memory<Src> || SIBMemory<Src>) && (Src::size == 32)
     inline constexpr auto movsxd(const Dest& dest, const Src& src) {
         return encode<e_instruction_id::movsxd>(dest, src);
     }

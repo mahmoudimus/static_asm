@@ -573,6 +573,151 @@ namespace static_asm::x86 {
         }
     }
 
+    // Shared ModR/M memory form for the remaining instruction families. The
+    // template flags describe prefixes and the immediate tail; the address
+    // supplies REX.X/B and either a SIB or the RIP-relative disp32 form.
+    template<bool TwoByte, bool Operand16, bool RexW, bool RexR = false,
+        std::size_t ImmediateBytes = 0, SIBMemory Mem>
+    inline constexpr auto encode_sib_form(const Mem& mem, std::uint8_t opcode,
+        std::uint8_t reg_bits, std::uint64_t immediate = 0) {
+        static_assert(ImmediateBytes <= 4);
+        constexpr bool address32 = Register32<typename Mem::base_type> || Register32<typename Mem::index_type>;
+        constexpr bool rex_x = needs_rex_x<typename Mem::index_type>();
+        constexpr bool rex_b = needs_rex_b_sib<typename Mem::base_type>();
+        constexpr bool need_rex = RexW || RexR || rex_x || rex_b;
+        constexpr std::size_t total_size = address32 + Operand16 + need_rex + TwoByte + 1 + mem_tail_size<Mem>() + ImmediateBytes;
+        std::array<std::uint8_t, total_size> result{};
+        std::size_t i = 0;
+        if constexpr (address32)
+            result[i++] = 0x67;
+        if constexpr (Operand16)
+            result[i++] = 0x66;
+        if constexpr (need_rex)
+            result[i++] = static_cast<std::uint8_t>(0x40 | (RexW << 3) | (RexR << 2) | (rex_x << 1) | rex_b);
+        if constexpr (TwoByte)
+            result[i++] = 0x0F;
+        result[i++] = opcode;
+        write_mem_tail<Mem>(reg_bits, mem, result.data(), i);
+        for (std::size_t k = 0; k < ImmediateBytes; ++k)
+            result[i++] = static_cast<std::uint8_t>(immediate >> (8 * k));
+        return result;
+    }
+
+    template<e_instruction_id Id, Register Reg, SIBMemory Mem>
+    inline constexpr auto encode_bitscan_sib(instruction_desc desc, const Reg&, const Mem& mem) {
+        static_assert(Reg::size == Mem::size && Reg::size >= 16, "BSF/BSR source and destination widths must match");
+        return encode_sib_form<true, Reg::size == 16, Reg::size == 64, Reg::extended>(
+            mem, desc.primary_opcode(), static_cast<std::uint8_t>(Reg::id()));
+    }
+
+    template<e_instruction_id Id, SIBMemory Mem, typename Source>
+    inline constexpr auto encode_bt_sib(instruction_desc desc, const Mem& mem, const Source& source) {
+        static_assert(Mem::size >= 16, "BT memory operand must be 16, 32, or 64 bits");
+        if constexpr (Register<Source>) {
+            static_assert(Source::size == Mem::size, "BT register and memory widths must match");
+            const auto opcode = static_cast<std::uint8_t>((desc.primary_opcode() & 0xFE) | 1);
+            return encode_sib_form<true, Mem::size == 16, Mem::size == 64, Source::extended>(
+                mem, opcode, static_cast<std::uint8_t>(Source::id()));
+        } else if constexpr (Immediate8<Source>) {
+            return encode_sib_form<true, Mem::size == 16, Mem::size == 64, false, 1>(
+                mem, 0xBA, static_cast<std::uint8_t>(opcodeext_bt(Id)), source.value());
+        } else if constexpr (Integer<Source>) {
+            return encode_bt_sib<Id>(desc, mem, imm8(static_cast<std::uint8_t>(source)));
+        } else {
+            static_assert(sizeof(Source) == 0, "BT memory source must be an equal-width register or imm8");
+        }
+    }
+
+    template<e_instruction_id Id, Register Reg, SIBMemory Mem>
+    inline constexpr auto encode_cmov_sib(instruction_desc desc, const Reg&, const Mem& mem) {
+        static_assert(Reg::size == Mem::size && Reg::size >= 16, "CMOV source and destination widths must match");
+        return encode_sib_form<true, Reg::size == 16, Reg::size == 64, Reg::extended>(
+            mem, desc.primary_opcode(), static_cast<std::uint8_t>(Reg::id()));
+    }
+
+    template<e_instruction_id Id, Register Reg, SIBMemory Mem>
+    inline constexpr auto encode_imul_two_sib(instruction_desc desc, const Reg&, const Mem& mem) {
+        static_assert(Reg::size == Mem::size && Reg::size >= 16, "IMUL source and destination widths must match");
+        return encode_sib_form<true, Reg::size == 16, Reg::size == 64, Reg::extended>(
+            mem, desc.primary_opcode(), static_cast<std::uint8_t>(Reg::id()));
+    }
+
+    template<e_instruction_id Id, Register Reg, SIBMemory Mem, typename Imm>
+    inline constexpr auto encode_imul_three_sib(instruction_desc desc, const Reg& reg, const Mem& mem, const Imm& imm) {
+        static_assert(Reg::size == Mem::size && Reg::size >= 16, "IMUL source and destination widths must match");
+        if constexpr (Integer<Imm>) {
+            if constexpr (Reg::size == 16)
+                return encode_imul_three_sib<Id>(desc, reg, mem,
+                    imm16(static_cast<std::uint16_t>(internal::checked_test_memory_immediate<16>(imm))));
+            else if constexpr (Reg::size == 64)
+                return encode_imul_three_sib<Id>(desc, reg, mem,
+                    imm32(internal::checked_qword_imm32(imm)));
+            else
+                return encode_imul_three_sib<Id>(desc, reg, mem,
+                    imm32(internal::checked_test_memory_immediate<32>(imm)));
+        } else if constexpr (Immediate8<Imm>) {
+            return encode_sib_form<false, Reg::size == 16, Reg::size == 64, Reg::extended, 1>(
+                mem, 0x6B, static_cast<std::uint8_t>(Reg::id()), imm.value());
+        } else if constexpr (Immediate<Imm>) {
+            static_assert(Imm::size == (Reg::size == 16 ? 16 : 32), "IMUL immediate width must match the encoded form");
+            return encode_sib_form<false, Reg::size == 16, Reg::size == 64, Reg::extended, Imm::size / 8>(
+                mem, 0x69, static_cast<std::uint8_t>(Reg::id()), imm.value());
+        } else {
+            static_assert(sizeof(Imm) == 0, "IMUL requires an integer or immediate");
+        }
+    }
+
+    template<e_instruction_id Id, Register Reg, SIBMemory Mem>
+    inline constexpr auto encode_movzx_movsx_sib(instruction_desc desc, const Reg&, const Mem& mem) {
+        static_assert((Mem::size == 8 && Reg::size >= 16) || (Mem::size == 16 && Reg::size >= 32),
+            "MOVZX/MOVSX requires an 8- or 16-bit source and a wider destination");
+        const auto opcode = static_cast<std::uint8_t>(desc.primary_opcode() + (Mem::size == 16));
+        return encode_sib_form<true, Reg::size == 16, Reg::size == 64, Reg::extended>(
+            mem, opcode, static_cast<std::uint8_t>(Reg::id()));
+    }
+
+    template<e_instruction_id Id, Register Reg, SIBMemory Mem>
+    inline constexpr auto encode_movsxd_sib(instruction_desc desc, const Reg&, const Mem& mem) {
+        static_assert(Reg::size == 64 && Mem::size == 32, "MOVSXD requires a 64-bit destination and 32-bit memory source");
+        return encode_sib_form<false, false, true, Reg::extended>(
+            mem, desc.primary_opcode(), static_cast<std::uint8_t>(Reg::id()));
+    }
+
+    template<e_instruction_id Id, SIBMemory Mem>
+    inline constexpr auto encode_shift_sib(instruction_desc desc, const Mem& mem) {
+        return encode_sib_form<false, Mem::size == 16, Mem::size == 64>(
+            mem, Mem::size == 8 ? 0xD0 : 0xD1, desc.secondary_opcode());
+    }
+
+    template<e_instruction_id Id, SIBMemory Mem, typename Count>
+    inline constexpr auto encode_shift_sib(instruction_desc desc, const Mem& mem, const Count& count) {
+        if constexpr (IsCLRegister<Count>) {
+            return encode_sib_form<false, Mem::size == 16, Mem::size == 64>(
+                mem, Mem::size == 8 ? 0xD2 : 0xD3, desc.secondary_opcode());
+        } else if constexpr (Immediate8<Count>) {
+            return encode_sib_form<false, Mem::size == 16, Mem::size == 64, false, 1>(
+                mem, Mem::size == 8 ? 0xC0 : 0xC1, desc.secondary_opcode(), count.value());
+        } else if constexpr (Integer<Count>) {
+            return encode_shift_sib<Id>(desc, mem, imm8(static_cast<std::uint8_t>(count)));
+        } else {
+            static_assert(sizeof(Count) == 0, "shift count must be CL or imm8");
+        }
+    }
+
+    template<e_instruction_id Id, SIBMemory Mem>
+    inline constexpr auto encode_indirect_sib(const Mem& mem) {
+        static_assert(Mem::size == 64, "near indirect CALL/JMP requires qword memory");
+        constexpr std::uint8_t ext = Id == e_instruction_id::call ? 2 : 4;
+        return encode_sib_form<false, false, false>(mem, 0xFF, ext);
+    }
+
+    template<e_instruction_id Id, SIBMemory Mem>
+    inline constexpr auto encode_stack_sib(const Mem& mem) {
+        static_assert(Mem::size == 16 || Mem::size == 64, "PUSH/POP memory operand must be word or qword");
+        constexpr bool is_push = Id == e_instruction_id::push;
+        return encode_sib_form<false, Mem::size == 16, false>(mem, is_push ? 0xFF : 0x8F, is_push ? 6 : 0);
+    }
+
     // =========================================================================
     // SIB Encoding for MOV: mov reg, [base + index*scale + disp]
     // =========================================================================
@@ -1874,6 +2019,12 @@ namespace static_asm::x86 {
         if constexpr (SIBMemory<Op1> || SIBMemory<Op2>) {
             if constexpr (desc.encoding() == e_encoding::alu) {
                 return encode_alu_sib<Id>(desc, op1, op2);
+            } else if constexpr (desc.encoding() == e_encoding::bitscan) {
+                return encode_bitscan_sib<Id>(desc, op1, op2);
+            } else if constexpr (desc.encoding() == e_encoding::bt) {
+                return encode_bt_sib<Id>(desc, op1, op2);
+            } else if constexpr (desc.encoding() == e_encoding::cmov) {
+                return encode_cmov_sib<Id>(desc, op1, op2);
             } else if constexpr (desc.encoding() == e_encoding::mov) {
                 return encode_mov_sib<Id>(desc, op1, op2);
             } else if constexpr (desc.encoding() == e_encoding::lea) {
@@ -1882,6 +2033,14 @@ namespace static_asm::x86 {
                 return encode_xchg<Id>(desc, op1, op2);
             } else if constexpr (desc.encoding() == e_encoding::test) {
                 return encode_test_sib<Id>(desc, op1, op2);
+            } else if constexpr (desc.encoding() == e_encoding::imul_two_op) {
+                return encode_imul_two_sib<Id>(desc, op1, op2);
+            } else if constexpr (desc.encoding() == e_encoding::movzx_movsx) {
+                return encode_movzx_movsx_sib<Id>(desc, op1, op2);
+            } else if constexpr (desc.encoding() == e_encoding::movsxd_enc) {
+                return encode_movsxd_sib<Id>(desc, op1, op2);
+            } else if constexpr (desc.encoding() == e_encoding::shift) {
+                return encode_shift_sib<Id>(desc, op1, op2);
             } else {
                 static_assert(sizeof(Op1) == 0, "SIB addressing not supported for this instruction type");
             }
@@ -1927,7 +2086,10 @@ namespace static_asm::x86 {
         constexpr auto desc = find_instruction_desc<Id>();
 
         if constexpr (desc.encoding() == e_encoding::imul_three_op) {
-            return encode_imul_three<Id>(desc, op1, op2, op3);
+            if constexpr (SIBMemory<Op2>)
+                return encode_imul_three_sib<Id>(desc, op1, op2, op3);
+            else
+                return encode_imul_three<Id>(desc, op1, op2, op3);
         } else {
             static_assert("Failed to encode three-operand instruction");
         }
@@ -1957,24 +2119,39 @@ namespace static_asm::x86 {
         } else if constexpr (desc.encoding() == e_encoding::bswap) {
             return encode_bswap<Id>(desc, op1);
         } else if constexpr (desc.encoding() == e_encoding::call) {
-            return encode_call<Id>(desc, op1);
+            if constexpr (SIBMemory<Op1>)
+                return encode_indirect_sib<Id>(op1);
+            else
+                return encode_call<Id>(desc, op1);
         } else if constexpr (desc.encoding() == e_encoding::pop) {
-            return encode_pop<Id>(desc, op1);
+            if constexpr (SIBMemory<Op1>)
+                return encode_stack_sib<Id>(op1);
+            else
+                return encode_pop<Id>(desc, op1);
         } else if constexpr (desc.encoding() == e_encoding::push) {
-            return encode_push<Id>(desc, op1);
+            if constexpr (SIBMemory<Op1>)
+                return encode_stack_sib<Id>(op1);
+            else
+                return encode_push<Id>(desc, op1);
         } else if constexpr (desc.encoding() == e_encoding::jcc) {
             return encode_jcc<Id>(desc, op1);
         } else if constexpr (desc.encoding() == e_encoding::jcc_near) {
             return encode_jcc_near<Id>(desc, op1);
         } else if constexpr (desc.encoding() == e_encoding::jmp) {
-            return encode_jmp<Id>(desc, op1);
+            if constexpr (SIBMemory<Op1>)
+                return encode_indirect_sib<Id>(op1);
+            else
+                return encode_jmp<Id>(desc, op1);
         } else if constexpr (desc.encoding() == e_encoding::unary) {
             return encode_unary<Id>(desc, op1);
         } else if constexpr (desc.encoding() == e_encoding::muldiv) {
             return encode_muldiv<Id>(desc, op1);
         } else if constexpr (desc.encoding() == e_encoding::shift) {
             // Single-operand shift: shift by 1
-            return encode_shift_by_one<Id>(desc, op1);
+            if constexpr (SIBMemory<Op1>)
+                return encode_shift_sib<Id>(desc, op1);
+            else
+                return encode_shift_by_one<Id>(desc, op1);
         } else if constexpr (desc.encoding() == e_encoding::int_imm) {
             // INT imm8
             return encode_int<Id>(static_cast<std::uint8_t>(op1));

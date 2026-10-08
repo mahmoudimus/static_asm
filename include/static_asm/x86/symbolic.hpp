@@ -408,6 +408,83 @@ namespace static_asm::x86::instructions {
 
 #undef STATIC_ASM_LABEL_MEMORY_BINARY
 
+#define STATIC_ASM_LABEL_MEMORY_SOURCE(Name)                                \
+    template<typename Op, typename Label, std::size_t Width>                \
+    constexpr auto Name(const Op& op, label_memory<Label, Width>) {         \
+        return detail::make_rip_ref<Label, Width>([&](const auto& memory) { \
+            return Name(op, memory);                                        \
+        });                                                                 \
+    }
+
+    STATIC_ASM_LABEL_MEMORY_SOURCE(bsf)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(bsr)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmova)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovnbe)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovae)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovnb)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovnc)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovb)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovc)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovnae)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovbe)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovna)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmove)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovz)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovg)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovnle)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovge)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovnl)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovl)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovnge)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovle)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovng)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovne)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovnz)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovno)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovnp)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovpo)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovns)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovo)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovp)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovpe)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(cmovs)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(imul)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(movzx)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(movsx)
+    STATIC_ASM_LABEL_MEMORY_SOURCE(movsxd)
+
+#undef STATIC_ASM_LABEL_MEMORY_SOURCE
+
+#define STATIC_ASM_LABEL_MEMORY_DEST(Name)                                  \
+    template<typename Label, std::size_t Width, typename Op>                \
+    constexpr auto Name(label_memory<Label, Width>, const Op& op) {         \
+        return detail::make_rip_ref<Label, Width>([&](const auto& memory) { \
+            return Name(memory, op);                                        \
+        });                                                                 \
+    }
+
+    STATIC_ASM_LABEL_MEMORY_DEST(bt)
+    STATIC_ASM_LABEL_MEMORY_DEST(btc)
+    STATIC_ASM_LABEL_MEMORY_DEST(btr)
+    STATIC_ASM_LABEL_MEMORY_DEST(bts)
+    STATIC_ASM_LABEL_MEMORY_DEST(shl)
+    STATIC_ASM_LABEL_MEMORY_DEST(shr)
+    STATIC_ASM_LABEL_MEMORY_DEST(sal)
+    STATIC_ASM_LABEL_MEMORY_DEST(sar)
+    STATIC_ASM_LABEL_MEMORY_DEST(rol)
+    STATIC_ASM_LABEL_MEMORY_DEST(ror)
+    STATIC_ASM_LABEL_MEMORY_DEST(rcl)
+    STATIC_ASM_LABEL_MEMORY_DEST(rcr)
+
+#undef STATIC_ASM_LABEL_MEMORY_DEST
+
+    template<typename Reg, typename Label, std::size_t Width, typename Imm>
+    constexpr auto imul(const Reg& reg, label_memory<Label, Width>, const Imm& imm) {
+        return detail::make_rip_ref<Label, Width>([&](const auto& memory) {
+            return imul(reg, memory, imm);
+        });
+    }
+
 #define STATIC_ASM_LABEL_MEMORY_UNARY(Name)                                \
     template<typename Label, std::size_t Width>                            \
     constexpr auto Name(label_memory<Label, Width>) {                      \
@@ -424,6 +501,18 @@ namespace static_asm::x86::instructions {
     STATIC_ASM_LABEL_MEMORY_UNARY(imul)
     STATIC_ASM_LABEL_MEMORY_UNARY(div)
     STATIC_ASM_LABEL_MEMORY_UNARY(idiv)
+    STATIC_ASM_LABEL_MEMORY_UNARY(shl)
+    STATIC_ASM_LABEL_MEMORY_UNARY(shr)
+    STATIC_ASM_LABEL_MEMORY_UNARY(sal)
+    STATIC_ASM_LABEL_MEMORY_UNARY(sar)
+    STATIC_ASM_LABEL_MEMORY_UNARY(rol)
+    STATIC_ASM_LABEL_MEMORY_UNARY(ror)
+    STATIC_ASM_LABEL_MEMORY_UNARY(rcl)
+    STATIC_ASM_LABEL_MEMORY_UNARY(rcr)
+    STATIC_ASM_LABEL_MEMORY_UNARY(call)
+    STATIC_ASM_LABEL_MEMORY_UNARY(jmp)
+    STATIC_ASM_LABEL_MEMORY_UNARY(push)
+    STATIC_ASM_LABEL_MEMORY_UNARY(pop)
 
 #undef STATIC_ASM_LABEL_MEMORY_UNARY
 
