@@ -23,7 +23,7 @@ jobs:
         sudo apt-get install -y clang-format-19
 
     - name: Configure CMake
-      run: cmake -B build -DSTATIC_ASM_BUILD_TESTS=ON
+      run: cmake -B build -DSTATIC_ASM_BUILD_TESTS=ON -DCLANG_FORMAT_EXE="$(command -v clang-format-19)"
 
     - name: Run format check
       run: ctest --test-dir build -R format-check --output-on-failure
@@ -117,11 +117,11 @@ jobs:
           -DSTATIC_ASM_BUILD_EXAMPLES=OFF
 
     - name: Build
-      run: cmake --build build --config ${{ matrix.build_type }} -j $(nproc)
+      run: cmake --build build --config ${{ matrix.build_type }} -j "$(nproc)"
 
     - name: Test
       working-directory: build
-      run: ctest -C ${{ matrix.build_type }} --output-on-failure -j $(nproc)
+      run: ctest -C ${{ matrix.build_type }} --output-on-failure -E '^format-check$' -j "$(nproc)"
 
   # macOS builds with Apple Clang
   macos:
@@ -144,11 +144,11 @@ jobs:
           -DSTATIC_ASM_BUILD_EXAMPLES=OFF
 
     - name: Build
-      run: cmake --build build --config ${{ matrix.build_type }} -j $(sysctl -n hw.ncpu)
+      run: cmake --build build --config ${{ matrix.build_type }} -j "$(sysctl -n hw.ncpu)"
 
     - name: Test
       working-directory: build
-      run: ctest -C ${{ matrix.build_type }} --output-on-failure -j $(sysctl -n hw.ncpu)
+      run: ctest -C ${{ matrix.build_type }} --output-on-failure -E '^format-check$' -j "$(sysctl -n hw.ncpu)"
 
   # Windows MSVC builds
   windows-msvc:
@@ -175,7 +175,7 @@ jobs:
 
     - name: Test
       working-directory: build
-      run: ctest -C ${{ matrix.build_type }} --output-on-failure -j $env:NUMBER_OF_PROCESSORS
+      run: ctest -C ${{ matrix.build_type }} --output-on-failure -E '^format-check$' -j $env:NUMBER_OF_PROCESSORS
 
   # Windows Clang builds (clang-cl)
   windows-clang:
@@ -209,7 +209,7 @@ jobs:
 
     - name: Test
       working-directory: build
-      run: ctest -C ${{ matrix.build_type }} --output-on-failure -j $env:NUMBER_OF_PROCESSORS
+      run: ctest -C ${{ matrix.build_type }} --output-on-failure -E '^format-check$' -j $env:NUMBER_OF_PROCESSORS
 
   # MinGW builds on Windows
   windows-mingw:
@@ -249,4 +249,4 @@ jobs:
     - name: Test
       shell: msys2 {0}
       working-directory: build
-      run: ctest -C ${{ matrix.build_type }} --output-on-failure -j $(nproc)
+      run: ctest -C ${{ matrix.build_type }} --output-on-failure -E '^format-check$' -j $(nproc)

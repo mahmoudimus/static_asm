@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.19)
 project(static_asm
-    VERSION 1.0.0
+    VERSION 0.2.0
     DESCRIPTION "A C++20 compile-time x86 assembler library"
     LANGUAGES CXX
 )

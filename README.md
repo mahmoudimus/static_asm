@@ -539,7 +539,7 @@ include(FetchContent)
 FetchContent_Declare(
     static_asm
     GIT_REPOSITORY https://github.com/mahmoudimus/static_asm.git
-    GIT_TAG v1.0.0  # or specific commit
+    GIT_TAG v0.1.0  # latest published release; update to v0.2.0 after release
 )
 FetchContent_MakeAvailable(static_asm)
 

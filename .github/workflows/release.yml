@@ -238,8 +238,8 @@ jobs:
         if: steps.guard.outputs.skip == 'false'
         run: |
           cmake -B build -DCMAKE_BUILD_TYPE=Release
-          cmake --build build -j$(nproc)
-          ctest --test-dir build --output-on-failure
+          cmake --build build -j"$(nproc)"
+          ctest --test-dir build --output-on-failure -E '^format-check$'
 
       - name: Test single-header
         if: steps.guard.outputs.skip == 'false'
