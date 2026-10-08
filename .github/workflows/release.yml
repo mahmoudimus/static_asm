@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag name (e.g. v1.0.0). If empty, uses latest tag.'
+        description: 'Release tag name (e.g. v0.2.0). If empty, uses latest tag.'
         required: false
         default: ''
   workflow_run:
