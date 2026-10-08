@@ -25,7 +25,7 @@ if(NOT no_exceptions_result EQUAL 0)
     message(FATAL_ERROR "Valid operand control failed with exceptions disabled:\n${no_exceptions_stdout}${no_exceptions_stderr}")
 endif()
 
-foreach(case_number RANGE 1 18)
+foreach(case_number RANGE 1 26)
     execute_process(
         COMMAND "${COMPILER}" -std=c++20 -O2 "-I${INCLUDE_DIR}"
             "-DSTATIC_ASM_INVALID_CASE=${case_number}"
@@ -55,6 +55,10 @@ foreach(case_number RANGE 1 18)
         set(expected_diagnostic "only one displacement may be added")
     elseif(case_number EQUAL 17 OR case_number EQUAL 18)
         set(expected_diagnostic "every referenced label must have exactly one definition")
+    elseif(case_number EQUAL 19)
+        set(expected_diagnostic "TEST register and memory widths must match")
+    elseif(case_number EQUAL 20)
+        set(expected_diagnostic "high-byte registers")
     else()
         set(expected_diagnostic "constant expression")
     endif()

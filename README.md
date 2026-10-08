@@ -128,6 +128,8 @@ mov(rax, qword_ptr(rip + 0x10));   // 48 8B 05 10 00 00 00
 lea(rax, qword_ptr(rip + 0x100));  // 48 8D 05 00 01 00 00
 add(qword_ptr(rip + 0x20), rbx);   // 48 01 1D 20 00 00 00
 inc(qword_ptr(rip + 0x40));        // 48 FF 05 40 00 00 00
+test(rax, qword_ptr(rip + 0x10)); // 48 85 05 10 00 00 00
+test(qword_ptr(rip + 0), 0x10);   // 48 F7 05 00 00 00 00 10 00 00 00
 ```
 
 ### SIB Addressing (Scale-Index-Base)
@@ -343,17 +345,18 @@ constexpr auto code = core::assemble(
 // 48 8D 05 01 00 00 00  C3  BE BA FE CA 00 00 00 00
 ```
 
-RIP-relative labeled memory also works with MOV, XCHG, ADD/ADC/SUB/SBB/CMP,
-AND/OR/XOR, and unary/multiply/divide memory forms. A trailing immediate needs
-no manual displacement-tail length:
+RIP-relative labeled memory also works with MOV, XCHG, TEST,
+ADD/ADC/SUB/SBB/CMP, AND/OR/XOR, and unary/multiply/divide memory forms.
+A trailing immediate needs no manual displacement-tail length:
 
 ```cpp
 constexpr auto data = label<"counter">;
 constexpr auto code = core::assemble(
     mov(dword_ptr(data), 0x7B),
+    test(qword_ptr(data), 0x10),
     ret(),
     data.assemble(
-        dd(0)
+        dq(0)
     )
 );
 ```
@@ -610,10 +613,10 @@ byte arrays, but cannot place x86 bytes in their instruction stream.
 Known gaps:
 
 - **RIP-relative memory encoder coverage.** Labeled memory operands use the
-  same encoder forms as literal RIP-relative memory. MOV, LEA, XCHG,
+  same encoder forms as literal RIP-relative memory. MOV, LEA, XCHG, TEST,
   ADD/ADC/SUB/SBB/CMP, AND/OR/XOR, INC/DEC/NEG/NOT, and MUL/IMUL/DIV/IDIV
-  have labeled forms. For example, `test(rax, qword_ptr(data))` is not supported
-  because the underlying `test(rax, qword_ptr(rip + 0))` form is not encoded yet.
+  have labeled forms. Other families still lack literal RIP-relative memory
+  encoding; for example, `bsf(rax, qword_ptr(rip + 0))` is not supported yet.
 - **No SIMD/AVX/VEX/EVEX**, x87, or segment-override prefixes.
 
 ## Developing

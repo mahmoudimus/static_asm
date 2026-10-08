@@ -56,6 +56,22 @@ constexpr auto invalid = assemble(jmp(missing));
 #elif STATIC_ASM_INVALID_CASE == 18
 constexpr auto duplicate = label<"duplicate">;
 constexpr auto invalid = assemble(duplicate.assemble(nop()), duplicate.assemble(ret()));
+#elif STATIC_ASM_INVALID_CASE == 19
+constexpr auto invalid = test(eax, qword_ptr(rip + 0));
+#elif STATIC_ASM_INVALID_CASE == 20
+constexpr auto invalid = test(ah, byte_ptr(r8 + disp<0>));
+#elif STATIC_ASM_INVALID_CASE == 21
+constexpr auto invalid = test(qword_ptr(rip + 0), 0x100000000ULL);
+#elif STATIC_ASM_INVALID_CASE == 22
+constexpr auto invalid = test(qword_ptr(rip + 0), 0x80000000ULL);
+#elif STATIC_ASM_INVALID_CASE == 23
+constexpr auto invalid = test(qword_ptr(rbx), 0x100000000ULL);
+#elif STATIC_ASM_INVALID_CASE == 24
+constexpr auto invalid = test(byte_ptr(rip + 0), 0x100);
+#elif STATIC_ASM_INVALID_CASE == 25
+constexpr auto invalid = test(word_ptr(rip + 0), 0x10000);
+#elif STATIC_ASM_INVALID_CASE == 26
+constexpr auto invalid = test(dword_ptr(rip + 0), 0x100000000ULL);
 #else
     #error Unknown invalid operand case
 #endif

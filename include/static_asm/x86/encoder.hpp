@@ -67,6 +67,29 @@ namespace static_asm::x86 {
             return low;
         }
 
+        template<std::size_t Width, Integer T>
+        constexpr std::uint32_t checked_test_memory_immediate(T value) {
+            static_assert(Width == 8 || Width == 16 || Width == 32 || Width == 64);
+            if constexpr (Width == 64) {
+                return checked_qword_imm32(value);
+            } else {
+                const auto bits = static_cast<std::uint64_t>(value);
+                constexpr auto mask = (std::uint64_t{ 1 } << Width) - 1;
+                const auto encoded = bits & mask;
+                const auto sign_extended = (encoded & (std::uint64_t{ 1 } << (Width - 1)))
+                                               ? (encoded | ~mask)
+                                               : encoded;
+                if (bits != encoded && bits != sign_extended) {
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
+                    throw std::out_of_range("TEST memory immediate does not fit the encoded width");
+#else
+                    std::abort();
+#endif
+                }
+                return static_cast<std::uint32_t>(encoded);
+            }
+        }
+
         template<e_instruction_id Id, typename Op1, typename Op2, typename... Args>
             requires DerivesBaseOperand<Op1> && (DerivesBaseOperand<Op2> || IsVoidOperand<Op2>)
         inline constexpr auto encode([[maybe_unused]] instruction_desc desc, Args&&... args) {
@@ -1053,6 +1076,108 @@ namespace static_asm::x86 {
         return encode_test<Id>(desc, op1, immediate<typename truncate_as<Op1>::type>(op2));
     }
 
+    // TEST r/m, r has no direction bit. Either API operand order places the
+    // register in ModR/M.reg and the memory address in ModR/M.r/m.
+    template<e_instruction_id Id, typename Op1, typename Op2>
+        requires(Register<Op1> && SIBMemory<Op2>) || (SIBMemory<Op1> && Register<Op2>)
+    inline constexpr auto encode_test_sib([[maybe_unused]] instruction_desc desc, const Op1& op1, const Op2& op2) {
+        constexpr bool reg_first = Register<Op1>;
+        using Reg = std::conditional_t<reg_first, Op1, Op2>;
+        using Mem = std::conditional_t<reg_first, Op2, Op1>;
+        static_assert(Reg::size == Mem::size, "TEST register and memory widths must match");
+        const Mem& mem = [&]() -> const Mem& {
+            if constexpr (reg_first)
+                return op2;
+            else
+                return op1;
+        }();
+
+        constexpr bool need_rex = needs_rex_sib<Reg, typename Mem::base_type, typename Mem::index_type>();
+        static_assert(!(HighByteRegister<Reg> && need_rex),
+            "high-byte registers AH/CH/DH/BH cannot be encoded with a REX prefix");
+        constexpr bool need_16bit_prefix = Reg::size == 16;
+        constexpr bool need_address_prefix = Register32<typename Mem::base_type>;
+        constexpr std::size_t total_size = need_address_prefix + need_16bit_prefix + need_rex + 1 + mem_tail_size<Mem>();
+        std::array<std::uint8_t, total_size> result{};
+        std::size_t i = 0;
+        if constexpr (need_address_prefix)
+            result[i++] = 0x67;
+        if constexpr (need_16bit_prefix)
+            result[i++] = 0x66;
+        if constexpr (need_rex) {
+            // SPL/BPL/SIL/DIL need a REX byte, but they are not r8b-r15b and
+            // must not set REX.R even though their operand types force REX.
+            constexpr bool rex_r = Reg::extended && static_cast<std::uint8_t>(Reg::id()) >= 8;
+            constexpr bool rex_x = needs_rex_x<typename Mem::index_type>();
+            constexpr bool rex_b = needs_rex_b_sib<typename Mem::base_type>();
+            result[i++] = static_cast<std::uint8_t>(0x40 | ((Reg::size == 64) << 3) | (rex_r << 2) | (rex_x << 1) | rex_b);
+        }
+        result[i++] = Reg::size == 8 ? 0x84 : 0x85;
+        write_mem_tail<Mem>(static_cast<std::uint8_t>(Reg::id()), mem, result.data(), i);
+        return result;
+    }
+
+    template<e_instruction_id Id, typename Mem, typename Imm>
+        requires SIBMemory<Mem> && Immediate<Imm>
+    inline constexpr auto encode_test_sib([[maybe_unused]] instruction_desc desc, const Mem& mem, const Imm& imm) {
+        if constexpr (Imm::size > mem_imm_size(Mem::size) * 8)
+            (void)internal::checked_test_memory_immediate<Mem::size>(imm.value());
+
+        constexpr bool need_address_prefix = Register32<typename Mem::base_type>;
+        constexpr bool need_16bit_prefix = Mem::size == 16;
+        constexpr bool need_rex = need_rex_mem_ext<Mem>();
+        constexpr std::size_t imm_size = mem_imm_size(Mem::size);
+        constexpr std::size_t total_size = need_address_prefix + need_16bit_prefix + need_rex + 1 + mem_tail_size<Mem>() + imm_size;
+        std::array<std::uint8_t, total_size> result{};
+        std::size_t i = 0;
+        if constexpr (need_address_prefix)
+            result[i++] = 0x67;
+        if constexpr (need_16bit_prefix)
+            result[i++] = 0x66;
+        if constexpr (need_rex)
+            result[i++] = encode_rex_mem_ext<Mem>();
+        result[i++] = Mem::size == 8 ? 0xF6 : 0xF7;
+        write_mem_tail<Mem>(0 /* /0 */, mem, result.data(), i);
+        const auto value = static_cast<std::uint64_t>(imm.value());
+        for (std::size_t k = 0; k < imm_size; ++k)
+            result[i++] = static_cast<std::uint8_t>(value >> (8 * k));
+        return result;
+    }
+
+    template<e_instruction_id Id, typename Mem, typename T>
+        requires SIBMemory<Mem> && Integer<T>
+    inline constexpr auto encode_test_sib(instruction_desc desc, const Mem& mem, T value) {
+        const auto bits = internal::checked_test_memory_immediate<Mem::size>(value);
+        if constexpr (Mem::size == 8)
+            return encode_test_sib<Id>(desc, mem, immediate<std::uint8_t>(static_cast<std::uint8_t>(bits)));
+        else if constexpr (Mem::size == 16)
+            return encode_test_sib<Id>(desc, mem, immediate<std::uint16_t>(static_cast<std::uint16_t>(bits)));
+        else
+            return encode_test_sib<Id>(desc, mem, immediate<std::uint32_t>(bits));
+    }
+
+    template<typename Mem>
+        requires Memory<Mem> && Register<typename Mem::value_type>
+    inline constexpr auto test_memory_as_sib(const Mem& mem) {
+        using Base = typename Mem::value_type;
+        constexpr auto dt = e_displacement_type::disp0;
+        return sib_memory_operand<Base, no_index_t, 1, Mem::size, dt>{
+            address_expr<Base, no_index_t, 1, dt>{ mem.value(), no_index, 0 }
+        };
+    }
+
+    template<e_instruction_id Id, typename Reg, typename Mem>
+        requires Register<Reg> && Memory<Mem> && Register<typename Mem::value_type>
+    inline constexpr auto encode_test(instruction_desc desc, const Reg& reg, const Mem& mem) {
+        return encode_test_sib<Id>(desc, reg, test_memory_as_sib(mem));
+    }
+
+    template<e_instruction_id Id, typename Mem, typename Op>
+        requires Memory<Mem> && Register<typename Mem::value_type> && (Register<Op> || Immediate<Op> || Integer<Op>)
+    inline constexpr auto encode_test(instruction_desc desc, const Mem& mem, const Op& op) {
+        return encode_test_sib<Id>(desc, test_memory_as_sib(mem), op);
+    }
+
     // LEA instruction: load effective address
     template<e_instruction_id Id, typename Op1, typename Op2>
         requires Register<Op1> && Memory<Op2>
@@ -1755,6 +1880,8 @@ namespace static_asm::x86 {
                 return encode_lea_sib<Id>(desc, op1, op2);
             } else if constexpr (desc.encoding() == e_encoding::xchg) {
                 return encode_xchg<Id>(desc, op1, op2);
+            } else if constexpr (desc.encoding() == e_encoding::test) {
+                return encode_test_sib<Id>(desc, op1, op2);
             } else {
                 static_assert(sizeof(Op1) == 0, "SIB addressing not supported for this instruction type");
             }

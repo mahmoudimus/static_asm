@@ -235,3 +235,25 @@ TEST(SymbolicAssembly, SupportedRipMemoryFamilies) {
                         0x48, 0x81, 0x25, 0x01, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00,
                         0xC3, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)));
 }
+
+TEST(SymbolicAssembly, TestRegisterWithLabeledMemory) {
+    constexpr auto data = label<"test_data">;
+    constexpr auto code = core::assemble(
+        test(rax, qword_ptr(data)),
+        ret(),
+        data.assemble(dq(0)));
+    EXPECT_EQ(code, (internal::make_array<std::uint8_t>(
+                        0x48, 0x85, 0x05, 0x01, 0x00, 0x00, 0x00,
+                        0xC3, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)));
+}
+
+TEST(SymbolicAssembly, TestImmediateWithLabeledMemory) {
+    constexpr auto data = label<"test_immediate_data">;
+    constexpr auto code = core::assemble(
+        test(qword_ptr(data), 0x10),
+        ret(),
+        data.assemble(dq(0)));
+    EXPECT_EQ(code, (internal::make_array<std::uint8_t>(
+                        0x48, 0xF7, 0x05, 0x01, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0xC3,
+                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)));
+}
